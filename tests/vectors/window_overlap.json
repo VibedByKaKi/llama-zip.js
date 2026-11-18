@@ -1,0 +1,550 @@
+{
+ "note": "overlap is computed by main() from --window-overlap and the model's n_ctx; error kinds map to the parser.error messages",
+ "messages": {
+  "range_percent": "window overlap must be in the range [0%, 100%]",
+  "range_tokens": "window overlap must be in the range [-{n_ctx}, {n_ctx_minus_1}]",
+  "not_integer": "window overlap must be an integer (number of tokens) or a percentage (of the model's context length)"
+ },
+ "cases": [
+  {
+   "arg": "0%",
+   "n_ctx": 64,
+   "overlap": 0
+  },
+  {
+   "arg": "0",
+   "n_ctx": 64,
+   "overlap": 0
+  },
+  {
+   "arg": "50%",
+   "n_ctx": 64,
+   "overlap": 31
+  },
+  {
+   "arg": "100%",
+   "n_ctx": 64,
+   "overlap": 63
+  },
+  {
+   "arg": "25%",
+   "n_ctx": 64,
+   "overlap": 15
+  },
+  {
+   "arg": "33.3%",
+   "n_ctx": 64,
+   "overlap": 20
+  },
+  {
+   "arg": "99.9%",
+   "n_ctx": 64,
+   "overlap": 62
+  },
+  {
+   "arg": "12.5%",
+   "n_ctx": 64,
+   "overlap": 7
+  },
+  {
+   "arg": "0.5%",
+   "n_ctx": 64,
+   "overlap": 0
+  },
+  {
+   "arg": "1",
+   "n_ctx": 64,
+   "overlap": 1
+  },
+  {
+   "arg": "10",
+   "n_ctx": 64,
+   "overlap": 10
+  },
+  {
+   "arg": "63",
+   "n_ctx": 64,
+   "overlap": 63
+  },
+  {
+   "arg": "-1",
+   "n_ctx": 64,
+   "overlap": 63
+  },
+  {
+   "arg": "-10",
+   "n_ctx": 64,
+   "overlap": 54
+  },
+  {
+   "arg": "-64",
+   "n_ctx": 64,
+   "overlap": 0
+  },
+  {
+   "arg": " 7 ",
+   "n_ctx": 64,
+   "overlap": 7
+  },
+  {
+   "arg": "+3",
+   "n_ctx": 64,
+   "overlap": 3
+  },
+  {
+   "arg": "1_0",
+   "n_ctx": 64,
+   "overlap": 10
+  },
+  {
+   "arg": "101%",
+   "n_ctx": 64,
+   "error": "range_percent"
+  },
+  {
+   "arg": "-1%",
+   "n_ctx": 64,
+   "error": "range_percent"
+  },
+  {
+   "arg": "150%",
+   "n_ctx": 64,
+   "error": "range_percent"
+  },
+  {
+   "arg": "nan%",
+   "n_ctx": 64,
+   "error": "range_percent"
+  },
+  {
+   "arg": "inf%",
+   "n_ctx": 64,
+   "error": "range_percent"
+  },
+  {
+   "arg": "-inf%",
+   "n_ctx": 64,
+   "error": "range_percent"
+  },
+  {
+   "arg": "64",
+   "n_ctx": 64,
+   "error": "range_tokens"
+  },
+  {
+   "arg": "65",
+   "n_ctx": 64,
+   "error": "range_tokens"
+  },
+  {
+   "arg": "-65",
+   "n_ctx": 64,
+   "error": "range_tokens"
+  },
+  {
+   "arg": "abc",
+   "n_ctx": 64,
+   "error": "not_integer"
+  },
+  {
+   "arg": "",
+   "n_ctx": 64,
+   "error": "not_integer"
+  },
+  {
+   "arg": "%",
+   "n_ctx": 64,
+   "error": "not_integer"
+  },
+  {
+   "arg": "1.5",
+   "n_ctx": 64,
+   "error": "not_integer"
+  },
+  {
+   "arg": "1e2",
+   "n_ctx": 64,
+   "error": "not_integer"
+  },
+  {
+   "arg": "0x10",
+   "n_ctx": 64,
+   "error": "not_integer"
+  },
+  {
+   "arg": "5 %",
+   "n_ctx": 64,
+   "overlap": 3
+  },
+  {
+   "arg": "ten%",
+   "n_ctx": 64,
+   "error": "not_integer"
+  },
+  {
+   "arg": "50",
+   "n_ctx": 64,
+   "overlap": 50
+  },
+  {
+   "arg": "0%",
+   "n_ctx": 100,
+   "overlap": 0
+  },
+  {
+   "arg": "0",
+   "n_ctx": 100,
+   "overlap": 0
+  },
+  {
+   "arg": "50%",
+   "n_ctx": 100,
+   "overlap": 49
+  },
+  {
+   "arg": "100%",
+   "n_ctx": 100,
+   "overlap": 99
+  },
+  {
+   "arg": "25%",
+   "n_ctx": 100,
+   "overlap": 24
+  },
+  {
+   "arg": "33.3%",
+   "n_ctx": 100,
+   "overlap": 32
+  },
+  {
+   "arg": "99.9%",
+   "n_ctx": 100,
+   "overlap": 98
+  },
+  {
+   "arg": "12.5%",
+   "n_ctx": 100,
+   "overlap": 12
+  },
+  {
+   "arg": "0.5%",
+   "n_ctx": 100,
+   "overlap": 0
+  },
+  {
+   "arg": "1",
+   "n_ctx": 100,
+   "overlap": 1
+  },
+  {
+   "arg": "10",
+   "n_ctx": 100,
+   "overlap": 10
+  },
+  {
+   "arg": "99",
+   "n_ctx": 100,
+   "overlap": 99
+  },
+  {
+   "arg": "-1",
+   "n_ctx": 100,
+   "overlap": 99
+  },
+  {
+   "arg": "-10",
+   "n_ctx": 100,
+   "overlap": 90
+  },
+  {
+   "arg": "-100",
+   "n_ctx": 100,
+   "overlap": 0
+  },
+  {
+   "arg": " 7 ",
+   "n_ctx": 100,
+   "overlap": 7
+  },
+  {
+   "arg": "+3",
+   "n_ctx": 100,
+   "overlap": 3
+  },
+  {
+   "arg": "1_0",
+   "n_ctx": 100,
+   "overlap": 10
+  },
+  {
+   "arg": "101%",
+   "n_ctx": 100,
+   "error": "range_percent"
+  },
+  {
+   "arg": "-1%",
+   "n_ctx": 100,
+   "error": "range_percent"
+  },
+  {
+   "arg": "150%",
+   "n_ctx": 100,
+   "error": "range_percent"
+  },
+  {
+   "arg": "nan%",
+   "n_ctx": 100,
+   "error": "range_percent"
+  },
+  {
+   "arg": "inf%",
+   "n_ctx": 100,
+   "error": "range_percent"
+  },
+  {
+   "arg": "-inf%",
+   "n_ctx": 100,
+   "error": "range_percent"
+  },
+  {
+   "arg": "100",
+   "n_ctx": 100,
+   "error": "range_tokens"
+  },
+  {
+   "arg": "101",
+   "n_ctx": 100,
+   "error": "range_tokens"
+  },
+  {
+   "arg": "-101",
+   "n_ctx": 100,
+   "error": "range_tokens"
+  },
+  {
+   "arg": "abc",
+   "n_ctx": 100,
+   "error": "not_integer"
+  },
+  {
+   "arg": "",
+   "n_ctx": 100,
+   "error": "not_integer"
+  },
+  {
+   "arg": "%",
+   "n_ctx": 100,
+   "error": "not_integer"
+  },
+  {
+   "arg": "1.5",
+   "n_ctx": 100,
+   "error": "not_integer"
+  },
+  {
+   "arg": "1e2",
+   "n_ctx": 100,
+   "error": "not_integer"
+  },
+  {
+   "arg": "0x10",
+   "n_ctx": 100,
+   "error": "not_integer"
+  },
+  {
+   "arg": "5 %",
+   "n_ctx": 100,
+   "overlap": 4
+  },
+  {
+   "arg": "ten%",
+   "n_ctx": 100,
+   "error": "not_integer"
+  },
+  {
+   "arg": "50",
+   "n_ctx": 100,
+   "overlap": 50
+  },
+  {
+   "arg": "0%",
+   "n_ctx": 1000,
+   "overlap": 0
+  },
+  {
+   "arg": "0",
+   "n_ctx": 1000,
+   "overlap": 0
+  },
+  {
+   "arg": "50%",
+   "n_ctx": 1000,
+   "overlap": 499
+  },
+  {
+   "arg": "100%",
+   "n_ctx": 1000,
+   "overlap": 999
+  },
+  {
+   "arg": "25%",
+   "n_ctx": 1000,
+   "overlap": 249
+  },
+  {
+   "arg": "33.3%",
+   "n_ctx": 1000,
+   "overlap": 332
+  },
+  {
+   "arg": "99.9%",
+   "n_ctx": 1000,
+   "overlap": 998
+  },
+  {
+   "arg": "12.5%",
+   "n_ctx": 1000,
+   "overlap": 124
+  },
+  {
+   "arg": "0.5%",
+   "n_ctx": 1000,
+   "overlap": 4
+  },
+  {
+   "arg": "1",
+   "n_ctx": 1000,
+   "overlap": 1
+  },
+  {
+   "arg": "10",
+   "n_ctx": 1000,
+   "overlap": 10
+  },
+  {
+   "arg": "999",
+   "n_ctx": 1000,
+   "overlap": 999
+  },
+  {
+   "arg": "-1",
+   "n_ctx": 1000,
+   "overlap": 999
+  },
+  {
+   "arg": "-10",
+   "n_ctx": 1000,
+   "overlap": 990
+  },
+  {
+   "arg": "-1000",
+   "n_ctx": 1000,
+   "overlap": 0
+  },
+  {
+   "arg": " 7 ",
+   "n_ctx": 1000,
+   "overlap": 7
+  },
+  {
+   "arg": "+3",
+   "n_ctx": 1000,
+   "overlap": 3
+  },
+  {
+   "arg": "1_0",
+   "n_ctx": 1000,
+   "overlap": 10
+  },
+  {
+   "arg": "101%",
+   "n_ctx": 1000,
+   "error": "range_percent"
+  },
+  {
+   "arg": "-1%",
+   "n_ctx": 1000,
+   "error": "range_percent"
+  },
+  {
+   "arg": "150%",
+   "n_ctx": 1000,
+   "error": "range_percent"
+  },
+  {
+   "arg": "nan%",
+   "n_ctx": 1000,
+   "error": "range_percent"
+  },
+  {
+   "arg": "inf%",
+   "n_ctx": 1000,
+   "error": "range_percent"
+  },
+  {
+   "arg": "-inf%",
+   "n_ctx": 1000,
+   "error": "range_percent"
+  },
+  {
+   "arg": "1000",
+   "n_ctx": 1000,
+   "error": "range_tokens"
+  },
+  {
+   "arg": "1001",
+   "n_ctx": 1000,
+   "error": "range_tokens"
+  },
+  {
+   "arg": "-1001",
+   "n_ctx": 1000,
+   "error": "range_tokens"
+  },
+  {
+   "arg": "abc",
+   "n_ctx": 1000,
+   "error": "not_integer"
+  },
+  {
+   "arg": "",
+   "n_ctx": 1000,
+   "error": "not_integer"
+  },
+  {
+   "arg": "%",
+   "n_ctx": 1000,
+   "error": "not_integer"
+  },
+  {
+   "arg": "1.5",
+   "n_ctx": 1000,
+   "error": "not_integer"
+  },
+  {
+   "arg": "1e2",
+   "n_ctx": 1000,
+   "error": "not_integer"
+  },
+  {
+   "arg": "0x10",
+   "n_ctx": 1000,
+   "error": "not_integer"
+  },
+  {
+   "arg": "5 %",
+   "n_ctx": 1000,
+   "overlap": 49
+  },
+  {
+   "arg": "ten%",
+   "n_ctx": 1000,
+   "error": "not_integer"
+  },
+  {
+   "arg": "50",
+   "n_ctx": 1000,
+   "overlap": 50
+  }
+ ]
+}

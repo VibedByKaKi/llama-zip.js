@@ -141,3 +141,18 @@ The `LlamaZip` constructor also accepts the `n_ctx`, `n_gpu_layers`, and `use_ml
 1. **Speed:** Compression and decompression speeds are limited by the speed of LLM inference. This renders llama-zip significantly slower than traditional compression utilities. However, the compression ratios achieved by llama-zip may justify the trade-off in speed for certain use cases.
 2. **Portability:** llama-zip requires identical LLM behavior during compression and decompression. However, the backend that llama-zip uses for LLM inference, [llama.cpp](https://github.com/ggerganov/llama.cpp), does not currently guarantee deterministic behavior. This limits the portability of the compressed output of llama-zip, as it may not be decompressible on a different system, even if the same model is used. In practice, behavior also differs depending on the number of GPU layers offloaded, so the `--n-gpu-layers` option should be set to the same value during compression and decompression, in addition to the window overlap (`--window-overlap`) and context length (`--n-ctx`) options.
 3. **Binary Compression:** Due to its reliance on an LLM for prediction, llama-zip is best suited for compressing inputs that consist primarily of text. Although llama-zip can handle binary data by encoding invalid UTF-8 bytes using code points in Unicode's private use areas, it may not achieve high compression ratios on such data, potentially producing compressed output that is larger than the original input.
+
+## Tests
+
+The Python unit tests live in `tests/python`. They replace `llama_cpp.Llama` with a deterministic fake model, so they run without llama-cpp-python or a model file.
+
+```bash
+pip install -r requirements-dev.txt
+pytest --cov=llama_zip --cov-branch --cov-report=term-missing
+```
+
+If you only want the test dependencies without llama-cpp-python, install `numpy`, `more-itertools`, `tqdm`, `pytest` and `pytest-cov`.
+
+Model-independent test vectors (arithmetic coder, UTF-8 mapping, base64, window overlap, `compute_cdf` and fake-model round trips) are stored in `tests/vectors/*.json` so other implementations can reuse them. `python tests/python/generate_vectors.py` regenerates them from `llama_zip.py`.
+
+`tests/python/test_integration.py` does a real compress and decompress round trip. It is skipped unless `llama_cpp` is importable and the model file exists. Set `LLAMA_ZIP_TEST_MODEL` to the path of a GGUF file to choose the model.

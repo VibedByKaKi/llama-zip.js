@@ -1,0 +1,903 @@
+{
+ "model": {
+  "bos": 0,
+  "eos": 1,
+  "byte_base": 2,
+  "merges_hex": [
+   "20746865",
+   "746865",
+   "696e67",
+   "6865",
+   "7468",
+   "2020",
+   "20"
+  ],
+  "vocab_size": 265,
+  "tokenizer": "greedy longest match over merges, else one token per byte (id = byte_base + byte). Merge k has id byte_base + 256 + k. With space_prefix, a non empty text is tokenized as b' ' + text. detokenize concatenates the pieces, bos and eos are empty.",
+  "logits": "context is the token list given to the model (bos first). h = last*131 + before*31 + len(context)*7, where before is 0 for a one token context. logits[i] = ((h*(i+3) + i*i) % 31) / 2, as float32.",
+  "logprobs": "float64 log-softmax",
+  "n_ctx_default": 64
+ },
+ "cases": [
+  {
+   "name": "empty",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "",
+   "compressed_hex": "08"
+  },
+  {
+   "name": "one char",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "78",
+   "compressed_hex": "78732f0bf1"
+  },
+  {
+   "name": "the thing",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "746865207468696e67",
+   "compressed_hex": "fff82e37ff6b6dc05301da58a0"
+  },
+  {
+   "name": "sentence",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "746865206b696e6720746865207468696e672c20746865207468696e6720746865206b696e672c20696e20746865207468696e672e",
+   "compressed_hex": "fff82e37ff6b2fdccdaa74d31733b4860063d751ecd5903ad8d4712d740bd40b0ff3019cbe7e144302c44242a93523cd8ec0"
+  },
+  {
+   "name": "leading space",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "20746865206b696e67",
+   "compressed_hex": "fff82d2386eabf423b"
+  },
+  {
+   "name": "two leading spaces",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "202078",
+   "compressed_hex": "fff84d80"
+  },
+  {
+   "name": "non ASCII",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "636166c3a920e282ac20f09f9880",
+   "compressed_hex": "695f404e86137ac083335806f3b182a1690a9b24bcb3c876418963a680"
+  },
+  {
+   "name": "invalid bytes",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "6162fffec328807a",
+   "compressed_hex": "66b362f9cba7cc00591a78247f3974818cdaf983695325f1f2362a40"
+  },
+  {
+   "name": "PUA collision",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "61ee8080ee83bfee848062",
+   "compressed_hex": "66b3673221b353ccfd034c9b41bdfbb494ebd6932770286147345bf5fb1a75ddf0ff33fe9af690096f0fcdf746de20"
+  },
+  {
+   "name": "repetitive",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520",
+   "compressed_hex": "fff82e37d9a567be69061501dc3c7e0fdc718dbab46cff0d44cdaeb9d2cfc11dbf18d79383021bd8fb1dde88eac98f7042d2dd7cc5bc2259541160cdd43df4"
+  },
+  {
+   "name": "all bytes",
+   "space_prefix": false,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+   "compressed_hex": "0c240e369a22664cc1b22b193e3c82ff7982c1edd80ee3ba572d7252ce9ff76a6b43bfe892dfab7f76a42aeebebf2efec38816fa12e620c631d3daa34acac70b5c271fa602b06615c7d310f202e0b78b0d69f2e56d300ea15609d59e9a989c1942455538bec82a42445e9867b70c5d7ea3dc9d7f451b4d54ad99d5e6995c9ec4ca8467bc2b2b86db3b2d845460ac8cc136f89f182494eb9124fe5b8cf0aa46ab301a8e4593063e4181a8a9143ef998239da2d662bebbf2c2b3bb6ad02934e2396f14227f6b12c29db18d376f022e271cc44ed330e08675b7ab4290629777ea09fe2a02d27d9f74a88676d5d92cea356e86280b88cc7eb808ec0d54b4b1be7260c2d607e820d8118370613e0b4ac35bd080024c86ccc6c717d3562e49c128c67939428498e5b337c8f767db2ff35aeeeef989d609f45702ae4efe49d5764f6f2e1a5b7ce74f8e0a09aea70cf718178336cf2e85dfde9949c09753832def53fb0edff51369fb984526234f246b848db76bbd4359f60627e07529f3dd1c761d64033468b03e8a265e5498e51bda7aa651e9c49a79dcd70caa8399b2b507e7ed8e998bd9c49fc5c0ed809cd87dfedc988e0cfb4eb4e0c65d6644befb4d9be2d13eda74b455b1842d1e6edb4bf95c68575a3bacbd61f8fd266b99f7de221b2267ae053e636354cca451f45ca30874dfe42e514400bb97c51bd8a45c9cf616ca602ee4551b4f2da77a29921e54ddeaf07f39176c38e318eb5e349a68fc61ac53fc59495732fb33bbeb521d5c6e6bc204ca8092d5b2f3718c41f3ff7cd69a17ba6d161146b396ab8b8cd378b90297d8a05af67f024a3c1ff8921cde8537d4d3ea32ec4b01352a7d2daa958d16d659650eaf300ec830cde2f1b944ac8d294ae33379112951f610ccd7df4856ce1171951a9da081aa075b13e3fc7cf008edf77ee36163f47f8e3b528b9952e6c55d9effadd7259614fcf30b2cac90aa38fdd085096560bd377c0593aae282f2b47dbbb33597863bbc87a063d7c4b68a05aedba827eac9dec9bb532d9a2a75f877daca1ac8f7ab7550c9d20dcc7f1e624e391db2462439881f2725fe6ab3b2d2dc19576a69878d825601170b958e7d7f0fc450f64bb5dfa952a4896208baa1c9c57992c03ae7cadf0a9a255e35c1e076eb40d41619df007d45f29390db25f1d3de5a89a60c55579bc69c7484a9d6e9ed651a9b53d5e7b220025cca17174ad94b2a550136a20a656ff1ecf7b6056d6f20ccd0efdbd04a6cb36532f79dac821eb7c1fa1fd54d28d946d002e8505996ae509d1394353c9d51dbc0ce2434c94bd16e467efb508195c6471df484e3eabbfa5aa235764920238aa740e1e4ee02bc9efd02402281181fba1c037b5ada2113fdaa9a40"
+  },
+  {
+   "name": "empty",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "",
+   "compressed_hex": "08"
+  },
+  {
+   "name": "one char",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "78",
+   "compressed_hex": "78732f0bf1"
+  },
+  {
+   "name": "the thing",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "746865207468696e67",
+   "compressed_hex": "fff82e37ff6b6dc05301da58a0"
+  },
+  {
+   "name": "sentence",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "746865206b696e6720746865207468696e672c20746865207468696e6720746865206b696e672c20696e20746865207468696e672e",
+   "compressed_hex": "fff82e37ff6b2fdccdaa74d31733b4860063d751ecd5903ad8d4712d740bd40b10940eb09fae6cea9004b4310d7e1ff7c0468e94bee0b314832e"
+  },
+  {
+   "name": "leading space",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "20746865206b696e67",
+   "compressed_hex": "fff82d2386eabf423b"
+  },
+  {
+   "name": "two leading spaces",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "202078",
+   "compressed_hex": "fff84d80"
+  },
+  {
+   "name": "non ASCII",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "636166c3a920e282ac20f09f9880",
+   "compressed_hex": "695f404e86137ac083335806f3b182a1690a9b24bcb3c876418963a680"
+  },
+  {
+   "name": "invalid bytes",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "6162fffec328807a",
+   "compressed_hex": "66b362f9cba7cc00591a78247f3974818cdaf983695325f1f238"
+  },
+  {
+   "name": "PUA collision",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "61ee8080ee83bfee848062",
+   "compressed_hex": "66b3673221b353ccfd034c9b41bdfbb494ebd6932770286147345bf5fb1a75d68289121b0605534fe83996d8"
+  },
+  {
+   "name": "repetitive",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520",
+   "compressed_hex": "fff82e37d9a567be69061501dc3c7e0fdc718dbab46cff0d44cdaeb9d2cfc11dc0692c11b98230b3eebb84ff0b3a5bcdd000dd5eedba3440c1917be95ce06ce8"
+  },
+  {
+   "name": "all bytes",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+   "compressed_hex": "0c240e369a22664cc1b22b193e3c82ff7982c1edd80ee3ba572d7252ce9ff76a6b44aba926857c02486fa0c68366083d2a28ee8daea30bfd63bac383d5b0c05fa56008fdb20869d3bc4d122a2c329e9e0cc3e424b742416a1176e944149c5de6c2445c3b4c70b2b258afff295098f066e7e144c72cbcf65dbcb720f1b60025ae206ffccc7604f9294712c501198b8d6bcf031b61fbcd7fd9b046a379dfc15f134365053143f190c5e139655ae856007cc14e33944596cbac0fd1665634c68788e21e263c0151eda61dc298c11384a98217063cda5eac48e0d242652a262c0d74b76339535d1f7a5f376b04fc725890787ba62d1a1a4de926de6c640b401495910fc515e6d8b1d7639c4cffa19d1bb49799740f9a84031c404cab805db61ef669aaeaef4bde307954d09486465f80058e657c153defd167462e66743dc3a9e4130dcdb4d53d1ff5d0bf7b93c78aecdecedfb49709959b47bf686bd46d99a7e617211a98302132292bf056cfb3003c4bff1460512b3f7cab530fcce6b64fd9f7b369225c9efcd39409d8202b1c77d5f6b37e3cd033fe639f13155d1811e90fe2eccb9426b68400e0857bd85c7c7d5ae742d4dd9c4e74ef8a080b44ab6c8cb6b0e66463d5687d73281d5454ea0c7f277e717beef19dab2dbb101380d70c5468ba3eeaa2c5940f31f7fe150105d1e791ed69f02133010e76b10fb40b36977e4bbf0639375bcaa24dff7a8324c7088c87fd6427c6c6c37fa6e00466fd51f026d08a123337c73a3b3787d7e46b3367771d4a924dcf8b0ee21e3aa302242e58cb769fc4a4f1417dacaf30985314f52beb490a98cdeeba66d73f0d8fed299ec63bc497b1ed018fd144b1ac4f22e302d2db7709ff80ed02771a0bb373d5929c19119dbd1e34f47a4542ca63d0d0d481612e162fbd9cb366975b8c30e58e0ab5911c61eb0d5e61d9e0befab1086b341ea8ad05862dcfa41cc1d90c9c9d0fa7c258dba0a1adc0497f561b6f52f6882423bcef9d3f0bca15a245515de36ee3d8365fc2cdd64120abc3265d4530fb0bc4c40ce24591f9bba27cd40ba126fb547a25302be70913ed46215dac0ebf3ae32f647be2266a89515662c7748fd731b8033292fdf5eb9d47369519d68565b756c937a74be06cfdbdbdb300b1eabd8d28a9490a0fe9ba02eaf50e83c4a9099e8f8ae209ee9c1418b4de59731ef292789118d69e104c5cadf7cefed5789ac333b93b1fb8daceb98889e5d2f1be1e5a945908a22b455a5a1fed176dc4d97122c1fe775326b7418e61615e92caa0247b857d198a3973b3d73814934b067e16f2499c216e14b1c38fd027a2b1e83afdc00bb3d29c82a3584b3433690144dddee18d8ad5e5437b8f6e"
+  },
+  {
+   "name": "empty",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "",
+   "compressed_hex": "08"
+  },
+  {
+   "name": "one char",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "78",
+   "compressed_hex": "78732f0bf1"
+  },
+  {
+   "name": "the thing",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "746865207468696e67",
+   "compressed_hex": "fff82e37ff6b6dc05301da58a0"
+  },
+  {
+   "name": "sentence",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "746865206b696e6720746865207468696e672c20746865207468696e6720746865206b696e672c20696e20746865207468696e672e",
+   "compressed_hex": "fff82e37ff6b2fdccdaa74d31733b4860063d751ecd5903ad8d4712d740bd40b0eed96ee84d417826756ac2fa17dc4c47b58"
+  },
+  {
+   "name": "leading space",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "20746865206b696e67",
+   "compressed_hex": "fff82d2386eabf423b"
+  },
+  {
+   "name": "two leading spaces",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "202078",
+   "compressed_hex": "fff84d80"
+  },
+  {
+   "name": "non ASCII",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "636166c3a920e282ac20f09f9880",
+   "compressed_hex": "695f404e86137ac083335806f3b182a1690a9b24bcb3c876418963a680"
+  },
+  {
+   "name": "invalid bytes",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "6162fffec328807a",
+   "compressed_hex": "66b362f9cba7cc00591a78247f3974818cdaf983695325f1f2362c"
+  },
+  {
+   "name": "PUA collision",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "61ee8080ee83bfee848062",
+   "compressed_hex": "66b3673221b353ccfd034c9b41bdfbb494ebd6932770286147345bf5fb1a75cd7b4f773ebff62c04b192603a205aa5e0"
+  },
+  {
+   "name": "repetitive",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520",
+   "compressed_hex": "fff82e37d9a567be69061501dc3c7e0fdc718dbab46cff0d44cdaeb9d2cfc11dbf92cead73182b982ba77c911f4d73a5ae356a1720163d388b8b01a3d7835d1580"
+  },
+  {
+   "name": "all bytes",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+   "compressed_hex": "0c240e369a22664cc1b22b193e3c82ff7982c1edd80ee3ba572d7252ce9ff76a6b447556053c13b2e6d616bc07cf2008eea6a7abd18697bea97f23c4b0e52fe90a4541b6e4bc1ac622921eb63a2362e9c21c402b4bd1ad2f0a73adc38594edb3469fcd7f3e6e39f69cacd1c055c24e2d3d3f9a37c80c18e0f05db3a8ad26efc40928f941b39f2565b429ae3823f72e3d13fb953b47d20f35374003dac691e00dbb1ad0b95b022224ec869153d51f4798d95d6cd104456ad7b80406a3af7b735d2eade88d74bbfd100b560b237beeeb4b51165679a387d955466e42effabe027ab72b2b0943c5a5f4cd7a2eb8281447be26ccaf1baf14bb39b84400ef88d07bd36b6c5735318ec94103acfe94d1934fe4097c9cb6d6797b500bf4680c3108ffd6f1d4aa7d0b2156a8dd51cdb3f5f1901b5d174ad8e89478a4a0c96aaddd3f01b24bd5491e0791bfbe8a8edde025a4e2eabb82e584b55b6d1bb3ad20d5150a422489b22c52a6f7c0deadfa2713bd5c984a484ff0ea293b50f92f150145db65dcfe4067576882697749560f9a4afc689cd5e6125bb840c6f173fb1377c2bc9482f3b1521719dd34fb33ec685861428818edb1a46be6e61c9170d4d88aeaa0839406429f9307c671cb1180cd07a340c6d18afecf94de698adc8f31e1bd1ab1a11dd7ecbba54f16acea75a28162a22e9c0e96ba829e1b52f5c1d585042403897f1db8bae50ee778e0fa04c70bc4605ede8b3e794f7ed1ab41e55077eb348cf3bdd914c55238291c3f1787d985ef3f3fb40a3559a9a4c95d2fd0c03013da862a443111034fb980426da2cec10a6b3089f9b3e492f94858e8848497ed1d9849b086279dd2b8f584df9ccc3d958e8b35dd764cc4cbab1c20b0d069527c080a0628136005327b43d22d547aa3bae23cdac75a6a0d5a097ddace9ea79fbdac03179d19522a409b5e29181061d5c9650291e9a67a92d1030621b9af60a356ac337e07114ebd82108e0c91eb8e49a5244ca2c16dac983f74c294b0e14b232a58b86010cd4a3605f0390121c9b35792f748c0f18027733baa3fc389071c3eec90e7ac4400e351e7f27700df515e15287882d7ced50074f4d95595a90a2f24b0ff04ba77c07b1e61aea844e85245023a35a9b055d308e88062ac9625fdb40fe869930c5439474bef61015d9cee17e478a1114a0ae415d687f00f89ffd889104ecb044419cf2cc2329c45784d0709eaf686a35f80fe85365a5895c47e8b13eb01d9729a2a94c24c8f288fcf3a1e7e98905882b47ed5d3de14921270a97d9dd0f98f411a486dee69b5462cbc5057ac9c383ef0899f585bff7237dba3479059098eb2d1451c123e2a226c0a91052e7a02f6f177b5e08b66a3c4532cf7b164a315f00feb300715ad53c1b25c01b3e238fd20e53b1d8d7a4469cdad01a24bdc"
+  },
+  {
+   "name": "empty",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "",
+   "compressed_hex": "08"
+  },
+  {
+   "name": "one char",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "78",
+   "compressed_hex": "78732f0bf1"
+  },
+  {
+   "name": "the thing",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "746865207468696e67",
+   "compressed_hex": "fff82e37ff6b6dc05301da58a0"
+  },
+  {
+   "name": "sentence",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "746865206b696e6720746865207468696e672c20746865207468696e6720746865206b696e672c20696e20746865207468696e672e",
+   "compressed_hex": "fff82e37ff6b2fdccdaa74d31733b4860063d751ecd5903ad8d4712d740bd40b10940eb0cc6f089ac5d64f432dbc3d164e04c5ff2d60"
+  },
+  {
+   "name": "leading space",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "20746865206b696e67",
+   "compressed_hex": "fff82d2386eabf423b"
+  },
+  {
+   "name": "two leading spaces",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "202078",
+   "compressed_hex": "fff84d80"
+  },
+  {
+   "name": "non ASCII",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "636166c3a920e282ac20f09f9880",
+   "compressed_hex": "695f404e86137ac083335806f3b182a1690a9b24bcb3c876418963a680"
+  },
+  {
+   "name": "invalid bytes",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "6162fffec328807a",
+   "compressed_hex": "66b362f9cba7cc00591a78247f3974818cdaf983695325f1f2369580"
+  },
+  {
+   "name": "PUA collision",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "61ee8080ee83bfee848062",
+   "compressed_hex": "66b3673221b353ccfd034c9b41bdfbb494ebd6932770286147345bf5fb1a75cddfd8fd15cd6e67cc7600a9d748"
+  },
+  {
+   "name": "repetitive",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520",
+   "compressed_hex": "fff82e37d9a567be69061501dc3c7e0fdc718dbab46cff0d44cdaeb9d2cfc11dbf77e70d783696299d6c222f2ff2e7c053d94b925ecaa7d612"
+  },
+  {
+   "name": "all bytes",
+   "space_prefix": false,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+   "compressed_hex": "0c240e369a22664cc1b22b193e3c82ff7982c1edd80ee3ba572d7252ce9ff76a6b3d51cbcae296a30e28f5a0340ce3978cd57c7c8152c63c653e625ec23fe97f09ba09f3fa5d2b997a64f9bfc0d7362908b4d219b29494a6be40cb840e58da3284cad7c4d87f15ae28fdb16276a64c30f43b5cf8decd1e216d615ecd700a995a9c23f3c3276c0db1862eec229b30c71912d1e5fa2478217ab3f6e77c51f338800e754d1c920cc11f2cc4c7dea27c459f11d03f57a86a266e211fe987508c17bf5518d5d42251f6bcca8de7b966bb72d5214ca20de34d2d8ba0016c770a6df7279a565b225b57fc299ad3494549e430c9f6cc414c63270b97a118367b0eea8e8b3bdadc84e32123a91404b3dd164f84ef8a4ef88c6708c2039a8c7f96e07677388a0d1e77c39870b3e5bceecec11e46fb31bbb945e0c14c69e15d118a87bb4608001b4c73e4451e1a510c89c5f6894d2c810c84c73448b7427adad899755174b06373fcc2854dd616e9dd55b632d7f2213ef0e99a1702da7d2f736c7e66fcca76da61febe1c36954e25f2422cfddda421482748bb4321c09cf11f36a2bf17aad619907702c449b5c0c9b13a5786e21b489d3de4680d0d512da4c304ecb14d05d5101c1d8a60550f76ca99512d0100537f445be5a47550b1c55920c146c8e13d50e73739d23accd957b913f042f4275908f61c5f2e25fe6affdcba6a1d7a398d649793bdf9fd495f660f8abdee1987e7436031c15364cc73971b9bd8c7b85a6b88339be39a7d74a634b93613f79b1ed8281fc78e66bb50fb08d05e24a8551108b51aaf5e1e4325eeaf6fb5ff480637f9f120ebca563eb889ec47e3c1172136b9219dbd962471cb681f4a6c524beed476c2b45a40bbb58be518fdfad124885413cf86f4c31507e632429e7735ee42680fd90fda072ddaed6f33ae9ea45c23569e7a7ab2caed56f6424071b6a462180f4208f6764528309dda775d418d7c20264012ede3a5b897e0384f5d3a7ff7987cfa7e13f757113cf6f86f9e529a53a19e09a14d4cce5e454f36602c2fb6e3c15550c0ea93a0b90a8b06e595942cc9e1505a19fb0f1e4776116f074f232100ef5cf216d5c18a31e2098a8afa958ec04b1e97c8ed2781f503f03e9d68cd0eaa4331cae01bcb81f38f0516a040742b0f765f1e3b8c4249200622c3e13ff69f9709c5614b94b54715addcc29cc94b4f99207e3069abf654cd0c029274b14fcdb83d98151417a5e237ce4ed8b76dd11b324497a0920c563bd01613f34efc5f293f18ef12307b8c2fe87f69ae878f3f3b00a93dd356"
+  },
+  {
+   "name": "empty",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "",
+   "compressed_hex": "08"
+  },
+  {
+   "name": "one char",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "78",
+   "compressed_hex": "78732f0bf1"
+  },
+  {
+   "name": "the thing",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "746865207468696e67",
+   "compressed_hex": "fff82e37ff6b6dc05301da58a0"
+  },
+  {
+   "name": "sentence",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "746865206b696e6720746865207468696e672c20746865207468696e6720746865206b696e672c20696e20746865207468696e672e",
+   "compressed_hex": "fff82e37ff6b2fdccdaa74d31733b4860064404b8c603dc6f59febd2795ba24db1ddb5c0aa81c38e5327f7b8829a2665d90ea5c8c0"
+  },
+  {
+   "name": "leading space",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "20746865206b696e67",
+   "compressed_hex": "fff82d2386eabf423b"
+  },
+  {
+   "name": "two leading spaces",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "202078",
+   "compressed_hex": "fff84d80"
+  },
+  {
+   "name": "non ASCII",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "636166c3a920e282ac20f09f9880",
+   "compressed_hex": "695f404e86137ac083335806f3b182ead6e173edca42f396a5b97c594798"
+  },
+  {
+   "name": "invalid bytes",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "6162fffec328807a",
+   "compressed_hex": "66b362f9cba7cc00591a78247f3fc36877316dc683145285550f0295c9af60"
+  },
+  {
+   "name": "PUA collision",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "61ee8080ee83bfee848062",
+   "compressed_hex": "66b3673221b353ccfd034c9b41bdfbb494ebc27ee2f8dc4c49ebb89ca2073c2af0bdcb9b36d37079d06346511c0d6bc0"
+  },
+  {
+   "name": "repetitive",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520",
+   "compressed_hex": "fff82e37d9a567be69061501dc3c7e0fdc718dbab4bb404d76129aada7bb0ca87b05dc64caf57a08217c7a5b4e4f62fcb9ae6155c3da736fb750c921a582645de7d74224c29d304a548a27abf17e253de6"
+  },
+  {
+   "name": "all bytes",
+   "space_prefix": false,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+   "compressed_hex": "0c240e369a22664cc1b22b193e3c84fb5065d388c89b257aeac5c8c438109645205cdb79f180bc1b87ebf2d37c701b7a44dff9978a5ccfee8424ddbb141e02d2b4f1a892d6161607a68574394b626415775b54f966d7680e4eea685071ed92fbe2d1363e6ee7815de1221943f4840a849846ddb31c3154c77cbbf153a54e6452442d71076e0a0d8a837d0d6d0a48843f1a1a2ff49ff268a116ee1d181451e84f5e316833ba12a9039a880a4f26ca54e4fec551d004071fd56477f63e29824af75cb122928afa8591895e865f1e2d4204a56144b26e99959120a805441ae947385f66f8a9cf1f3775d4d4079c10d034f4600d8c792c51f369fd91df669d6eea4078d5021729ae9ec248689b3e2f22bc469b1dc777ad07874104555185d3fb32610ed75fc528c6241d9193d9b3092f3ce3d8f7be665676f79bb160e0e543b12022bc37b17432f9030d49c88a70279af440a2a52e558d00a0efd869bb0ca9c1ed320c50bb9996280ff23ef8dbcab3c388b35b649b8fd07c16ed71c64f7d91a382ecb016aa74ae614affde21fce5f5aa71b866a8249342532ee3e8166fcc2b3421426dfc707d353ede9665d34f31f3c5740eb47c32da865c44cdf647203f447c0d0eae3377b51029832648f6c641fe5ebeb9e0fdd77836bc201dd1ab2a55d6d6e3d5fd0ffed5a5dea21bc43482daa012411560435cf272e5c4629e46b13fed0fe41fc5256d5778030e85b0bb34752f05a9819d9d5a68051093349cb0acfc704fb1a0007f8c40a546cf083b27aa135afdc25df7c10c7d8032496f1ad03412c589eca38dea0b5090ef3a6620ab32d14655eab8d59bf2b595c170396eefbcde92df3f094c10bb8a42bcc5c24ce01f848f771a3f75fd630c5fdc01b9b3d217503814c717354242e38c189f8d9d27e7ef4f91c787e82f7f9d956c56805801b8b0bf9186928c6d6970bb83b6713a764e4c30cfd4076cfbd9c54366cff40d28386f78dbc15d9609fc6f20ff949f07a918b32d510a0a158c4609896caf6ccd05ee3983b02a59fffb156db2d86b354cb6a5d083850b76c92a988d9a011ae45578e2bfe45d918ec658e05c4e6964076c53a79f3cc96c88d8df5eab77e27a92d622bacf929d3ee19b2e414009f28ab9f29794b24377533209bb023d511049ef75a301b3f9d10cfed14ddd4565c1d240a9213fbf528ce52edaa50c8e67040f5eb6450fcf6323332dbb0dc229cef8ce21b5b79518ce2ef337789888e3423845faed8fbbb6fae4a25a69db4511a72fa1fea14aad8a3e6c8a2dc559f12c5bc673757743f04f8604a86ce4a4d2ff589f9f1e6da5bcfc81883075463ef4be7c5321af4649ee4b7a29da589a26dff2d80d893ca57eb2b5e47c54b909e9d592199677c054b254cf40"
+  },
+  {
+   "name": "empty",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "",
+   "compressed_hex": "08"
+  },
+  {
+   "name": "one char",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "78",
+   "compressed_hex": "fffbfe9cad"
+  },
+  {
+   "name": "the thing",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "746865207468696e67",
+   "compressed_hex": "fff82d25fb58c33220cc"
+  },
+  {
+   "name": "sentence",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "746865206b696e6720746865207468696e672c20746865207468696e6720746865206b696e672c20696e20746865207468696e672e",
+   "compressed_hex": "fff82d2386eac1839cac8fa1d4508cd09038158e016d5cc709558b6d6daee31f644244ed3743c0e89886077d3d26c4"
+  },
+  {
+   "name": "leading space",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "20746865206b696e67",
+   "compressed_hex": "fff86e9b9e7c457bd66397e6a0"
+  },
+  {
+   "name": "two leading spaces",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "202078",
+   "compressed_hex": "fff86f38fed64f76"
+  },
+  {
+   "name": "non ASCII",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "636166c3a920e282ac20f09f9880",
+   "compressed_hex": "fffb8153a48f69bfbf7b29152de1c1cda75ef6f12f2c1bdc34700df6"
+  },
+  {
+   "name": "invalid bytes",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "6162fffec328807a",
+   "compressed_hex": "fffb7d99077e59cd7c70f4fe92a0b1da5c03b13b8dcc03147b97120acdfe"
+  },
+  {
+   "name": "PUA collision",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "61ee8080ee83bfee848062",
+   "compressed_hex": "fffb7f3d33b01aec6e829a68edeb44d9f7a1ab14d863be8a4ab4f78170595531277a6a4883a70ea27a960e60"
+  },
+  {
+   "name": "repetitive",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520",
+   "compressed_hex": "fff82d021e97b03a77b1cb8ff92f03adf8661673b70cfd6839089c833ba86c980eae4d173760c59609ebb41c5fbca2ff84c29b54e2fa8c6cbe85016b493bc0"
+  },
+  {
+   "name": "all bytes",
+   "space_prefix": true,
+   "n_ctx": 64,
+   "window_overlap": 0,
+   "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+   "compressed_hex": "fff86f39dcd40a4901519c2e944ae7aca1b8a2ea6f98de72e8345de30720fb55fed681969c33c9ca5a63d335385854af782116b81f485f0876f2ff85b553b60174157d0467c2d88845e8eec29c8dac1c640a17b1fcede8b2de98c922c83d8c5288cfb09f489122c9401b9af3167f3bf4f7c1c0d0165bfaec906158fb95108ff028c4c4e0d723d2451e1f135639cb45e56ed37a467284a43760db3310b74458f29a2ca9acd6b12f6f5d1bea659ec2d0e995a64c01468db34cc60e8d8dd28768733919c2c6ffb5f09083938675ec8caac42ec045817760802b793f5f75334b4db1bc8d877c7692016015e78af62c027ca9b5aa3f4aa7b6550f6cc2000373f71604f4026b114d47f5d9ba5fbf64c26efd2d0bc30a1270f8582db05fc2eb94ba9a30ddcc87b416c70cb373566515fa0f6fef45409fd8a7b1912f1d027bcf37444f9bbad4fe0d2dc578f26c4106a9c2cf28abd912f633b07e6bf7a5b459bda50dff08fc706da2b8f60c31780bdb73829cc827f6a7fc1d452b1a84aa48d7a247b022cafd850c71424c273ff7228addd3c5657015aaeaa7b27be243e1f6b8aa68cf32163dce95c4e477895278ce745aa5b0e4dec17d2e79200e6448bd28156cce84781590a5f9bf26eaebaa1fab9676f836c77592ab14e6f5434d2446d0ba165453902811b792d84aac3c37021550cd2172d85f8aeacc43dd03c722d2aabee4943b84a1706ec2150071f4f1e9b44a467cb52756badb134c29e36478c6f79b3f3d2e34a6e68b4e741db2d459ee12eb312c06e5623bbf519a01e2d0fe0ca6459c1785f4049037c3d7419a0ee9a99fdf4d628ac994df475be0695c3ddf8da19e86cea26bc65988e4d5cd8c17f7e8345e9f28ced533d145115af88ae99c22e6230360ff28e30f6dbf7e4f8f5bc35a2e71fbed845bc8ea6580a8b12bab2475e2cd2aea3698c825b1a7c259a2e60eee937f0a5d880830fa23f27bd1914b9de721de67edf6cc53a424dffa83f23a53cd9a95745e1400dd0e2c3e836c97061755acb39b89fedef98284658c08642266191c5d25420d5dcf7677ac48da160bf3a68811bbc42f73eac783150ba408fad533cfda90c6e393a4b26a225db6dc8c8464fce6c4adaa7af33124a79e81fabd57d2b7fb36e2f921f64915d67308950b06b0e47a8991a4d34c91e0c48d7a8f784eeced4f8d3ceb47e0da436f1bedf55b149dd75ad84b79517abacb065898c3300364da3bfa855ec98518745487824fd637ccf909bd6b9c37825c3c596f0bb95a079672e428ca6d5bfc7a9ea37266e0dbd1310ce7cde7b016e8b2dbfc4256ccd384b40584fe2cd0ec1d61e41c318e44cae08f"
+  },
+  {
+   "name": "empty",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "",
+   "compressed_hex": "08"
+  },
+  {
+   "name": "one char",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "78",
+   "compressed_hex": "fffbfe9cad"
+  },
+  {
+   "name": "the thing",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "746865207468696e67",
+   "compressed_hex": "fff82d25fb58c33220cc"
+  },
+  {
+   "name": "sentence",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "746865206b696e6720746865207468696e672c20746865207468696e6720746865206b696e672c20696e20746865207468696e672e",
+   "compressed_hex": "fff82d2386eac1839cac8fa1d4508cd09038158e016d5cc709558b6d6daee982bbd949791cf7509886d7d5f0c83d5356f05ff5b4e4bca5e0"
+  },
+  {
+   "name": "leading space",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "20746865206b696e67",
+   "compressed_hex": "fff86e9b9e7c457bd66397e6a0"
+  },
+  {
+   "name": "two leading spaces",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "202078",
+   "compressed_hex": "fff86f38fed64f76"
+  },
+  {
+   "name": "non ASCII",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "636166c3a920e282ac20f09f9880",
+   "compressed_hex": "fffb8153a48f69bfbf7b29152de1c1cda75ef6f12f2c1bdc34700df6"
+  },
+  {
+   "name": "invalid bytes",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "6162fffec328807a",
+   "compressed_hex": "fffb7d99077e59cd7c70f4fe92a0b1da5c03b13b8dcc03147b971b12"
+  },
+  {
+   "name": "PUA collision",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "61ee8080ee83bfee848062",
+   "compressed_hex": "fffb7f3d33b01aec6e829a68edeb44d9f7a1ab14d863be8a4ab4f7a06475502221ceb85361f1a537e6b428"
+  },
+  {
+   "name": "repetitive",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520",
+   "compressed_hex": "fff82d021e97b03a77b1cb8ff92f03adf8661673b70cfd6839089c833ba86c98365f37bd814c34fcb3bbc1f02d52a89797d0085670e0af35cbdd676bed15dc"
+  },
+  {
+   "name": "all bytes",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 0,
+   "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+   "compressed_hex": "fff86f39dcd40a4901519c2e944ae7aca1b8a2ea6f98de72e8345de30720fb56450e108112ff52258f2d8420b8444ff1d9fe3dda44f2ed990ee0bfa3228f3e58994c39ec22179981a6debd4dc926fc302c6e379b4d7e79b5c4b6465f86de7a2d90dbaa5c8c0c502e47a9e1c5ad52aa3fd6eba450329eaea07e03aa1c018f57a204f4345ec5bfb8e004ec2da2cee0b36eaf5e776d5857022ab2a6e62aed0d9f9028589e8187b24bd8fc119ec56f056d0ce5e72e31c6b2bab75202e77219c5f5676499721bd9405167a0f8a518d89a4edc9874776afcfef4edc380d8da6e4842be8930dd1886521218a64b01616fdb3fcca6c4fffbea351246a0e24f7178db5c7df39ddf0a892a2c1de108d10287953c24b0fbbe3fe55aa5329d0608df0f315f3e167b03345720d966fedd1744b6bb8c4c62cccbede3a1ccd3f41b68e7acafbc2a6bf942c0de257854a1c6f42c1f224cc2ec7c19a89821c46cb3e5a17ae1ed49e0759f3b5f391db1913aa5a3d5f5af951518951a3c682d60b89cc818849ff7cb86eb1bacb03424e29fae950425e901a3932f3e9c61091023e661a1ffe8a6ef136e7e4845754e6e26625c6f212dd7f3d26c03274a05764867bd6c3db0b912215ae20b501a2684a3ab3c7df16d2e1312047d2e931b6c42366e5608aa343faa7caefa75323388f201e08cefcf815d0437f3843158cf1fbbff03c9326968ce3e7eb4f42fb0f7f250f4c72ae530b0049f2b13fdecdda732d449358c76ddeeaf5959130e98a7157ec41252fda0c63ea743acb341a12707fda428767f2b02d9ac252ca5ef57ad2b0a2a08f8d3beb3333515729004a1bcf54e29700e35f39a04801e56516c14350b50f036389b9886ec809b08c28c868966623ebe39ecf29a8563e307943c9927232dee4df29b9de196d7de382d357e4b32b9fee9605b71f3d7738d56707a3aa3e2204701ad8d6e9c32e4d48b5abab85062c3c29a4423da582ca794027ddf46df9ce69c7cc561e38a1781683adc1c6ba0b6c8175d51bbee8cda4c6497b181c59a6645a1f36d9fef5104de03836ddff231ba96b0a5ce2566a7fd262c17488e6e66fe33ad477a5a1a6852e1585a19b1e5ae8b4ae52f91476f1d755848d1c2ea6726b418dc8dbf2368d473fb2a22e404b766e25b2668d74b81da19039407d44d18538e2e82db6b3224abff089bae89b22949b5ab87e8fe33dfa42cbc3fd3fda0336183f76d080f0c385ab170f8dbd06f731902c20c32a83d8271bd98a61f2e685fc2f19ee8f53db45d1ba82c864647c61ea99224b49d8fa40e120ec52b518a9377f13fe6c5f73213817bbd4bea6c5073517c925d24e0f5f25e44472725e46f7c5c2f960523d3b4fa47a63c3edd5771458989513340d4d3fb6ec0"
+  },
+  {
+   "name": "empty",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "",
+   "compressed_hex": "08"
+  },
+  {
+   "name": "one char",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "78",
+   "compressed_hex": "fffbfe9cad"
+  },
+  {
+   "name": "the thing",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "746865207468696e67",
+   "compressed_hex": "fff82d25fb58c33220cc"
+  },
+  {
+   "name": "sentence",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "746865206b696e6720746865207468696e672c20746865207468696e6720746865206b696e672c20696e20746865207468696e672e",
+   "compressed_hex": "fff82d2386eac1839cac8fa1d4508cd09038158e016d5cc709558b6d6daed8c0eb2104b3e3fa55f48f3080e4008344b0"
+  },
+  {
+   "name": "leading space",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "20746865206b696e67",
+   "compressed_hex": "fff86e9b9e7c457bd66397e6a0"
+  },
+  {
+   "name": "two leading spaces",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "202078",
+   "compressed_hex": "fff86f38fed64f76"
+  },
+  {
+   "name": "non ASCII",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "636166c3a920e282ac20f09f9880",
+   "compressed_hex": "fffb8153a48f69bfbf7b29152de1c1cda75ef6f12f2c1bdc34700df6"
+  },
+  {
+   "name": "invalid bytes",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "6162fffec328807a",
+   "compressed_hex": "fffb7d99077e59cd7c70f4fe92a0b1da5c03b13b8dcc03147b970cb327d3"
+  },
+  {
+   "name": "PUA collision",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "61ee8080ee83bfee848062",
+   "compressed_hex": "fffb7f3d33b01aec6e829a68edeb44d9f7a1ab14d863be8a4ab4f7a762d70c6f30ad0833e476745721fa63eccb1680"
+  },
+  {
+   "name": "repetitive",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520",
+   "compressed_hex": "fff82d021e97b03a77b1cb8ff92f03adf8661673b70cfd6839089c833ba86c981d1302cb365724a41839e7e1a9c160acda719f4b0b8d8ebda43eb2e8cf11315d"
+  },
+  {
+   "name": "all bytes",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 4,
+   "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+   "compressed_hex": "fff86f39dcd40a4901519c2e944ae7aca1b8a2ea6f98de72e8345de30720fb5620193a6e93afa82e8eb6fc73559a812b678082d2a203ff5d369c26fc105569ecf53b4861528daa1a47e0530827e9409004245c470a4c35eb66ba733a325f1110fc7d4e0fb5fbcd2c815ce01a3758ae8514d1d262f26c08b0354196d3672d4a28e0a6ab4f5f9788b01f140ac89e0b8e1613b76f7cfbaa1c6694da6575ec0e145c91b85b641a0c75f41b7c6ee878ba545b2d1067c4ebf85980d71edfedd58ed36aead019b423a7e6309cbfd74fc7c865db55133ae98cd277d00c3f66c5a159ea7d976e9a5b30a6baf263b185babf231163643d29aca79e3ddf24885fdd9f489826ea2f0bb0c85f8b7f98f2d6390cc296d2f5ac88b44ed7436eed5669bd0c9990e8047d7b6534aee0d8b1f06a81672f650867f0b22062e9506a04c0be17af12b6d7e850f665708d6bb097109073c7e1922e78e1a74268f4bf0b6254f6f9b53e8b804a209e2d4231238d346dc76a5d1dca76a5236916447b0bf4f9be6a138f2b1c56f2e5944b3dea83d4043e57d09d62c8231aca473b4a60e2dd11dd047fa71ff0bfb2f37f14dba63b691d9ef93b2f9056fa14c838dd52238097504b956c223d3e9d809b3881ae9aadaa8d45b9fdfa390564ac78a2944d615ee5ba80d07969e2cdc297508bef1c47e4d59eb134e4366a2bfd8da22f8dc8a33d3ae8c5cf66cbe7c0a6830824e19e6ca469f2d6df974b0530839fecd1173012f8a7f9dd85de7ad7cd43b5a3d605670d073df7e02132d5336a4506270158079e8d539495df8eb7a3e7be0dfa9f143806c9008c100756af77d1580267866e4659f9af621e71a639e488b1a7b0042df0d6a25bc416c32d61dee08c62167fcacabf122e516434521a071ad78753910f713c3bdf77048bba537c561650890b505e5363cc5b90e2881efe67620055baba75d26bd7e994b9fa2ff6f3f5f3caff36c67866948594f377ae725fdec9f3f4ffbd2accbcb146b5fd61d1ede2e08003545b001d89e524823725a4079ecd06d6a94efcaf99bb0d78f434cf1f1a52073e78bfa20eb8e14eeeba15e01571ca9560ced6dbb8e66e40590c220f21bc7431ddc49f3ecb81aaa0116aafa849f7f41756d354dbe236ebb3aef6fda428cff9f840be478dc9adc837cb38e43665dba18d3b0a71c69b3d1fa8fb6caca947baeb6595d50e1c3518ccfc9bd7da8883695fd26742e69d8bbc43d93069c5131c2368f5e8a1521f444fc0c1123dd10c5885adb97e07573d53c1726b0b0c5703d296d3c680"
+  },
+  {
+   "name": "empty",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "",
+   "compressed_hex": "08"
+  },
+  {
+   "name": "one char",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "78",
+   "compressed_hex": "fffbfe9cad"
+  },
+  {
+   "name": "the thing",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "746865207468696e67",
+   "compressed_hex": "fff82d25fb58c33220cc"
+  },
+  {
+   "name": "sentence",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "746865206b696e6720746865207468696e672c20746865207468696e6720746865206b696e672c20696e20746865207468696e672e",
+   "compressed_hex": "fff82d2386eac1839cac8fa1d4508cd09038158e016d5cc709558b6d6daee982bbdb0fe59b362f229592cc8b0316e56b49cd6e60"
+  },
+  {
+   "name": "leading space",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "20746865206b696e67",
+   "compressed_hex": "fff86e9b9e7c457bd66397e6a0"
+  },
+  {
+   "name": "two leading spaces",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "202078",
+   "compressed_hex": "fff86f38fed64f76"
+  },
+  {
+   "name": "non ASCII",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "636166c3a920e282ac20f09f9880",
+   "compressed_hex": "fffb8153a48f69bfbf7b29152de1c1cda75ef6f12f2c1bdc34700df6"
+  },
+  {
+   "name": "invalid bytes",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "6162fffec328807a",
+   "compressed_hex": "fffb7d99077e59cd7c70f4fe92a0b1da5c03b13b8dcc03147b97182290"
+  },
+  {
+   "name": "PUA collision",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "61ee8080ee83bfee848062",
+   "compressed_hex": "fffb7f3d33b01aec6e829a68edeb44d9f7a1ab14d863be8a4ab4f701205a4567344a6ff6d489422c2ffc"
+  },
+  {
+   "name": "repetitive",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520",
+   "compressed_hex": "fff82d021e97b03a77b1cb8ff92f03adf8661673b70cfd6839089c833ba86c9819e62fbeb4cd59300136234f9a7c16e5e4be2dd1b6cd648a80"
+  },
+  {
+   "name": "all bytes",
+   "space_prefix": true,
+   "n_ctx": 16,
+   "window_overlap": 15,
+   "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+   "compressed_hex": "fff86f39dcd40a4901519c2e944ae7aca1b8a2ea6f98de72e8345de30720fb5643c629be5e4017621e81f41f55e8c41802e52e4ceb474e36488ba43959c4dfdfad0ff12d94d15854449f9fec20154e18bc2ea9016fa4a1d5e73f27763f788f34b26a00531451db5cd4142e57e51e1c8abfba36e6dcb4b397d6ccd8f24a9e92df658a35e6b0b8d7973730f96f09653dda6e262454fb6a64ed7e9b9816dd97ede97f7761cf0ede395c0468a84443ca7bf4e68b358ec25265de16ff8cf59376b1973378d866da307cfe90283f486019c319ed30ba863ed9dca1d7a485d5b61e7a7c96c91b2b4208a44fe6d331c6a42f33e39b1bc94b32fdc1ab9a4c0d1aa2328120c977833b72787c65c6e8e48aa49b34e357bfb697288e9fb4f22702178a0c01163fa787385b347adea81be2625aafb643cef3e80b3ed108f84680861672dc925198edfc01c00332611005d7464e463b32e2d2155fb8bb2c2fae42222adc64863d8ba9cee7af6c31709e94adaffc15eec9e6702242679574738f80f8e19e5aeb74c741b984eb9ff7e0fc49f46d918baca5f559cc5138c6b4de94e47340c9d93b12dff1b95b9ae12f8a828a5709da9b5c2aea72d1105ddbcd0c2cb240ec27165cad42718de190ef6cc38a47142fd414da10ddcd308f9003d8ef46baa3d282dfe8401be114022ad5042e6491730ff3505c81e65d0e1035d1375779eae113c4fdcdbc6ddcfd7c10c89987703bc4126f4abd61d323f624219f3b58a49050c4cdb37d36e5a909b5d023de8ecdc8ecf2dcf1be84e39727d5a27d2707a1c55dbe8d5eea115a8e7e4ca230ed1954b7c849f5bb02b9d76080aa24aa0bac965abdecd6e5dc776a545a2adb8268aeda5c23f3c03e99de03f01f7c95b884bcb2b3bee1c39afa5978cf254a2e4f952a5e2fcc21d15880c90d87646b4e07d19c7af333ec4ace73b520f1fc8423dda9b63cc249fd5a71d7386f9ef1052aeb6c7ef8bd9c03b9f2d34cbf93841a1b794517b0ac0e6a85f667ee03744e769eddd7ecbba0c23c49c0556b4e527b46c72d3fe342eb519490c1d34346ea75e506fb634905c11cad3f4d7539f37214562316f794ba0318d07cc6f364bf5de11bc2ca6fc36ad8a9a9fed80c38d5afaabfd20a9dbfd1c71e7bb75bf7f4265bbbc04316ecd26c6c32d8bcea4c969044574250a6f152394ea81a8a97fe87fea06efbc37210bfd4eb4e42d2d9a2720766d191891d4a552e4b8214a18dafd845b50ff1a84c2160bd515b7bbffd5cf4e6f7e89dfb347e82cac02153545aa1cc6702ec8a837d5c34e478ee57fadc7a40"
+  },
+  {
+   "name": "empty",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "",
+   "compressed_hex": "08"
+  },
+  {
+   "name": "one char",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "78",
+   "compressed_hex": "fffbfe9cad"
+  },
+  {
+   "name": "the thing",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "746865207468696e67",
+   "compressed_hex": "fff82d25fb58c33220cc"
+  },
+  {
+   "name": "sentence",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "746865206b696e6720746865207468696e672c20746865207468696e6720746865206b696e672c20696e20746865207468696e672e",
+   "compressed_hex": "fff82d2386eac1839cac8fa1d4508cd4ba27c414b56d0bee0d11a4519c488c37dc8fc970e446647270805c8d159746b6326b"
+  },
+  {
+   "name": "leading space",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "20746865206b696e67",
+   "compressed_hex": "fff86e9b9e7c457bd66397e6a0"
+  },
+  {
+   "name": "two leading spaces",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "202078",
+   "compressed_hex": "fff86f38fed64f76"
+  },
+  {
+   "name": "non ASCII",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "636166c3a920e282ac20f09f9880",
+   "compressed_hex": "fffb8153a48f69bfbf7b29152de138af60dc85ecab3b5d3cabb81cfa74"
+  },
+  {
+   "name": "invalid bytes",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "6162fffec328807a",
+   "compressed_hex": "fffb7d99077e59cd7c70f4fe9266fac9dd89929749ceb3506947e2570b58"
+  },
+  {
+   "name": "PUA collision",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "61ee8080ee83bfee848062",
+   "compressed_hex": "fffb7f3d33b01aec6e829a68eed0ffcbed36c5563f9ea36897c52de25828caa6b29d64cc061de261db80"
+  },
+  {
+   "name": "repetitive",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520746865207468652074686520",
+   "compressed_hex": "fff82d021e97b03a77b1cb8ff92f03adf8661673c04928e3da283d280017d5b76b248dcba0f0221e269e882dc4c129ec1b3b2af8d603717a0e17138195df7467d8a38b8c8b0990028000ec0e6e430647c0"
+  },
+  {
+   "name": "all bytes",
+   "space_prefix": true,
+   "n_ctx": 8,
+   "window_overlap": 3,
+   "input_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+   "compressed_hex": "fff86f39dcd40a4901519c2e944ae7aca46d74f5f044534cbcfd40f60a439c0ed000b5784f70f26a3668b155d682aed5f54d233c788fd15827ac4abba3f83cc085583b997b3dea281dd8c4319e1e8c86c20a187dff5483b88a4c314a302002221f2b03fe8352bcff1109fc3a89465963224bcde1af5b821e038166af9ac5fa119aa5eb2071e3b0b25f5bee10f6c0175eaec536f8e5ae98ddbf3f871b634d22878df900008004265e0473744d016475b94e9258ba367606db210c386d69936ef5f55d8091ceff40f3db391cd209d0f0f6c287cda6ea2f5f98d6d886153885d3f6fbab07760b6c77da0177343d4ede6fe406a766f991b9f36bb8f242ca8a4f10d49a473b31f1dcb55945816a94b5caa393ee7cc7e7a298f165b2422c43b0ae8ae1a0df9831b33acd86ca4f333bbc35837b39db82b6cf96f73b9182163ac660b7f25c3eba0c3542c6d7e8b4039908fc8414096c5f509792d9abbdbe0acf534ec98299d80214af48b2cfc0a39404220b28fb7f4ef5df8a438ed294552a6714385c5a9808b095776601631114bc0eea8a6934c36f9fe035fa522b33b15692dbf07d1697b242dacbb10fd1f090d407caa6f4801eafaf1b4da53b1ebcc508520a689e2e25888d24fc58e94a46e8e7b933f9aa0c9fffba9dc5550555db5d8269f727066bd31c952812baf36b24c0684e911800e69949cb98d07aea44e6f67b15b2b9c7df5cb2d177a5d2e750dc3c60ad38332af29d43b37977746a30bc529e76fa0a3f430a7c6767a5fb9c9680f9d5fd7674963d73c0ab05ade810a297dc0c2f2b223876a7d1fcaf8105d899e8678f709ae63f7a61675b6f5fd06eb240eff3b08aeb3b204baae508e91ae386ef2012c79e0a303f872af952a1f8608266ca91cc390a43d3b8b32a97d32791c0f3e834a8d4d332cfcd1ae6e21cd50005696172b5a3592390e88a1459569d829ce15067163275ab7cd96905c9ee44128699410b06d8af6fce493b66092a2c3a481cf9334c02ba44188d384fd73e5c97979a7a568a9a1060f506f8e9348f2091239d2f6db8237d30109285b0daf23b15a80418d96cdccd27497d3d90e67efb726c4cdd99e3a3b4d46dac933e80fe7eed9da7edae0069cef03df49d01119c68dcef3551b13289070e09fba7dcbf17048080ea66fa3ed9880bcd9e585714c76fe7121e733e5d16bb6a2aa663ae3d5002b54ebe24aac578f47263f6f2ef0dff097c9cc39bb9e86d97b72e97b2a524a01ad9dbf5cbe19288b7e2e97a873c7bbb69e682483b47ffbce3a68e4cb31a62a40e7a257fb4adc5e5fe6ddebf7c68d93abfec679da020c9ccd8ddf4a9a99d0221c65d05442ef405bb04013896b69819b58edc7b7bd0eae8d1e8"
+  }
+ ]
+}
