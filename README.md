@@ -156,3 +156,73 @@ If you only want the test dependencies without llama-cpp-python, install `numpy`
 Model-independent test vectors (arithmetic coder, UTF-8 mapping, base64, window overlap, `compute_cdf` and fake-model round trips) are stored in `tests/vectors/*.json` so other implementations can reuse them. `python tests/python/generate_vectors.py` regenerates them from `llama_zip.py`.
 
 `tests/python/test_integration.py` does a real compress and decompress round trip. It is skipped unless `llama_cpp` is importable and the model file exists. Set `LLAMA_ZIP_TEST_MODEL` to the path of a GGUF file to choose the model.
+
+## JavaScript port (txiki.js)
+
+`js/` holds a port of `llama_zip.py` to [txiki.js](https://github.com/saghul/txiki.js) (`tjs`). It calls the system libllama through `tjs:ffi`, so it needs no Python.
+
+| File | Contents |
+| --- | --- |
+| `js/llamazip.js` | `LlamaZip` class (`compress`, `decompress`, `computeCdf`) |
+| `js/arithmetic.js` | `Encoder` and `Decoder`, with BigInt for the 64-bit state |
+| `js/utf8.js` | `Utf8Chunks`, `bytesToUtf8`, `utf8ToBytes` and the private use area mapping |
+| `js/cli.js` | Command line tool with the same flags as `llama_zip.py` |
+| `js/llama.js` | libllama binding (`LlamaModel`) |
+| `js/io.js` | stdout and stderr sinks |
+
+### Requirements
+
+- `tjs` v26.11.0 or newer.
+- libllama from llama.cpp build b10180 (the struct layouts in `js/llama.js` are checked at load time, so another ABI fails with an error). Install it with `brew install llama.cpp`, or `winget install ggml.llamacpp` on Windows. If the library is not in a standard location, set `LLAMA_LIB` to its full path.
+- A GGUF model, as for the Python tool.
+
+### Command line
+
+The options are the ones of the Python tool, plus `--n-threads`. `-h` lists them.
+
+```sh
+# Compress an argument string, print base64
+tjs run js/cli.js /path/to/llm.gguf -f base64 -c "The quick brown fox jumps over the lazy dog."
+
+# Compress a file to binary, then decompress it
+tjs run js/cli.js /path/to/llm.gguf -c < file.txt > file.lz
+tjs run js/cli.js /path/to/llm.gguf -d < file.lz
+
+# Interactive mode, with a window overlap of 50% of the context
+tjs run js/cli.js /path/to/llm.gguf -i -w 50%
+```
+
+Ctrl-C during compression stops early and finishes the stream, so the output still decompresses to the part that was read. During decompression and at the prompt it exits like the Python tool.
+
+### Library
+
+```js
+import { LlamaZip } from './js/llamazip.js';
+
+const zip = new LlamaZip('/path/to/model.gguf', { nCtx: 0, nGpuLayers: -1, nThreads: 4 });
+const compressed = await zip.compress(new TextEncoder().encode('The quick brown fox.'), 0);
+const original = await zip.decompress(compressed, 0);
+zip.close();
+```
+
+`compress` and `decompress` return `Uint8Array` and are async, so the event loop runs while they work. Both take `{ signal }` (an `AbortSignal`) as a third argument, and `decompress` also takes `{ maxTokens }`. `decompress` throws an error when the data ends without an end-of-stream token, where the Python tool would loop forever.
+
+### Differences from the Python tool
+
+- Compressed data from the two tools is not interchangeable. The Python tool computes the log-softmax in float32 with numpy, whose SIMD `exp` and `log` cannot be reproduced bit for bit in JavaScript. The JS port computes it in float64 and rounds half to even like `numpy.round`. The two cumulative frequency tables differ by a few units out of 2^32 for some tokens, and an arithmetic decoder diverges after that. For the sentence "The quick brown fox jumps over the lazy dog." the outputs already differ in the second character. The model logits themselves were bit-identical for a single token context.
+- Compression and decompression must use the same `--n-threads` (default 4, fixed so it does not depend on the machine), the same window overlap and `--n-ctx`, and the same libllama build. The format stores none of this. Each window is evaluated as `[BOS]` plus the overlap tokens, then one token per call, like `generate()` in llama-cpp-python, but without its reuse of the previous window's cache.
+- It is slower: about 45 tokens per second against about 100 for the Python tool on SmolLM2-135M Q8_0 (16 cores, CPU only). The model itself takes the same time. The remainder is the softmax over the 49,152 vocabulary entries, which txiki.js runs in an interpreter. Larger models spend relatively less time there.
+- A window overlap must be in `[0, n_ctx - 1]`, or the call throws.
+- The tokenizer of some models drops bytes. With SmolLM2-135M the bytes 0x04, 0x06, 0x13, 0x14, 0x16 and 0x1d do not survive tokenizing and detokenizing, so data containing them does not round trip. The Python tool has the same problem.
+
+### Tests
+
+The JS tests load the same vectors as the Python tests (`tests/vectors/*.json`) and use a fake model that follows `tests/vectors/llamazip_fake_model.json`, so everything except the real-model tests runs without libllama.
+
+```sh
+tjs run js/test/all.js                      # every module, one process each
+tjs run js/test/all.js arithmetic utf8      # chosen modules
+tjs run js/test/llamazip.test.js            # one module
+```
+
+The modules are `arithmetic`, `utf8`, `base64`, `compute_cdf`, `llamazip` and `cli`, which mirror the Python modules of the same names, `integration`, which does round trips with the real model and the CLI and is skipped when libllama or the model is missing (`LLAMA_ZIP_TEST_MODEL` and `LLAMA_LIB` choose them), and `llama`, the binding's own tests. txiki.js has no coverage tool, so the JS suite has no coverage number.
