@@ -64,6 +64,11 @@ export class Encoder extends ArithmeticCoderBase {
         return this.encodedData.slice(0, this.length);
     }
 
+    // Number of bits finalised so far. Bits held back as underflow are not counted yet.
+    get bitCount() {
+        return this.length === 0 ? 0 : (this.length - 1) * 8 + this.bitIndex;
+    }
+
     encodeSymbol(cdf, symbol) {
         this.update(cdf, symbol);
     }

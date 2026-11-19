@@ -2,7 +2,7 @@
 //   tjs run js/test/all.js [name ...]      names like arithmetic, utf8 (default: all)
 // Each module is run as `tjs run js/test/<name>.test.js`, so one crash cannot hide the others.
 // The real model modules (integration, llama) skip or fail on their own if libllama or the model is missing.
-const MODULES = ['arithmetic', 'utf8', 'base64', 'compute_cdf', 'llamazip', 'cli', 'integration', 'llama'];
+const MODULES = ['arithmetic', 'utf8', 'base64', 'compute_cdf', 'llamazip', 'trace', 'cli', 'integration', 'llama'];
 
 const selected = tjs.args.slice(3).length ? tjs.args.slice(3) : MODULES;
 const root = new URL('.', import.meta.url).pathname;

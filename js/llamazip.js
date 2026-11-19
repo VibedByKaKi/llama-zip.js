@@ -25,6 +25,7 @@ import { LlamaModel } from './llama.js';
 import { Encoder, Decoder } from './arithmetic.js';
 import { PUA_START, bytesToUtf8, utf8ToBytes } from './utf8.js';
 import { defaultIo } from './io.js';
+import { StepBuilder } from './trace.js';
 
 export { PUA_START };
 
@@ -204,6 +205,7 @@ export class LlamaZip {
         this.verbose = verbose;
         this.io = io;
         this.lastYield = Date.now();
+        this.busy = false;
         const showLoading = verbose && loadingMessage;
         if (showLoading) this.#sinks().err.write(LOADING_MESSAGE);
         this.model = createModel({ path: modelPath, nCtx, nGpuLayers, useMlock, nThreads, nBatch });
@@ -260,38 +262,117 @@ export class LlamaZip {
         return prefix.length;
     }
 
+    // Abandoned or failed call: the context holds a half-finished window, so clear it. The model
+    // may be closed already, which leaves no state to clear.
+    #clearContext() {
+        try {
+            this.model.reset();
+        }
+        catch {
+            // Nothing to clear.
+        }
+    }
+
+    // Marks the model as in use until the returned function is called, so two calls cannot
+    // interleave their evaluations on the one context.
+    #claim() {
+        if (this.busy) throw new Error('LlamaZip is already compressing or decompressing, wait for the other call to finish');
+        this.busy = true;
+        return () => {
+            this.busy = false;
+        };
+    }
+
     // Aborting `signal` stops early: the rest of the input is dropped and the stream is finished
     // with EOS, so the output still decodes to the part that was compressed.
-    async compress(uncompressed, windowOverlap = 0, { signal = null } = {}) {
-        this.#checkOverlap(windowOverlap);
-        const model = this.model;
-        const tokens = Array.from(model.tokenize(bytesToUtf8(uncompressed), { addBos: false }));
-        tokens.push(model.tokenEos());
-        let nextTokenIdx = 0;
-        const tokenEncoder = new Encoder();
-        const progress = this.verbose ? new ProgressBar(this.#sinks().err, { total: tokens.length, desc: 'Compressing', unit: 'tok' }) : null;
-
-        while (nextTokenIdx < tokens.length) {
-            const startIdx = Math.max(0, nextTokenIdx - windowOverlap);
-            let contextLength = this.#startWindow(tokens.slice(startIdx, nextTokenIdx));
+    //
+    // onStep(step) is called after each coded token (the EOS included) with the object that
+    // js/trace.js describes. If it returns a promise, compress waits for it, so a caller can slow
+    // the work down to the pace of a display. topK sets the number of candidates per step.
+    // Observers never change the compressed bytes.
+    async compress(uncompressed, windowOverlap = 0, { signal = null, onStep = null, topK, outputBitsCap } = {}) {
+        const steps = this.#compressSteps(uncompressed, windowOverlap, { signal, observe: onStep !== null, topK, outputBitsCap });
+        try {
             for (;;) {
-                const logits = model.logits({ copy: false });
-                if (signal?.aborted && nextTokenIdx < tokens.length - 1) {
-                    nextTokenIdx = tokens.length - 1;
-                    if (this.verbose) this.#sinks().err.write('\n');
-                }
-                const nextToken = tokens[nextTokenIdx++];
-                tokenEncoder.encodeSymbol(this.computeCdf(logits), nextToken);
-                progress?.update();
-                if (nextTokenIdx === tokens.length || contextLength === model.nCtx) break;
-                model.eval([nextToken]);
-                contextLength++;
-                await this.#maybeYield();
+                const next = await steps.next();
+                if (next.done) return next.value.compressed;
+                await onStep(next.value);
             }
         }
-        progress?.close();
-        tokenEncoder.finish();
-        return tokenEncoder.getEncoded();
+        finally {
+            await steps.return();
+        }
+    }
+
+    // Like compress, as an async generator that yields each step and returns
+    // { compressed, totalBits, tokens }. totalBits is the sum of the steps' bits (the ideal code
+    // length), and the compressed size is that rounded up plus the few bits the coder's final
+    // interval needs. Calling return() on the generator early stops the work and resets the model.
+    async *trace(uncompressed, windowOverlap = 0, { signal = null, topK, outputBitsCap } = {}) {
+        const steps = this.#compressSteps(uncompressed, windowOverlap, { signal, observe: true, topK, outputBitsCap });
+        try {
+            for (;;) {
+                const next = await steps.next();
+                if (next.done) return next.value;
+                yield next.value;
+            }
+        }
+        finally {
+            await steps.return();
+        }
+    }
+
+    // The compression loop. With observe it yields one step per token. Without it never yields,
+    // so the only cost over a plain loop is creating the generator.
+    async *#compressSteps(uncompressed, windowOverlap, { signal, observe, topK, outputBitsCap }) {
+        this.#checkOverlap(windowOverlap);
+        const release = this.#claim();
+        let finished = false;
+        try {
+            const model = this.model;
+            const tokens = Array.from(model.tokenize(bytesToUtf8(uncompressed), { addBos: false }));
+            tokens.push(model.tokenEos());
+            let nextTokenIdx = 0;
+            const tokenEncoder = new Encoder();
+            const builder = observe ? new StepBuilder(model, tokenEncoder, { topK, outputBitsCap }) : null;
+            const progress = this.verbose ? new ProgressBar(this.#sinks().err, { total: tokens.length, desc: 'Compressing', unit: 'tok' }) : null;
+            let windowIndex = -1;
+
+            while (nextTokenIdx < tokens.length) {
+                const startIdx = Math.max(0, nextTokenIdx - windowOverlap);
+                let contextLength = this.#startWindow(tokens.slice(startIdx, nextTokenIdx));
+                windowIndex++;
+                let windowReset = windowIndex > 0;
+                for (;;) {
+                    const logits = model.logits({ copy: false });
+                    if (signal?.aborted && nextTokenIdx < tokens.length - 1) {
+                        nextTokenIdx = tokens.length - 1;
+                        if (this.verbose) this.#sinks().err.write('\n');
+                    }
+                    const index = nextTokenIdx++;
+                    const nextToken = tokens[index];
+                    const cdf = this.computeCdf(logits);
+                    tokenEncoder.encodeSymbol(cdf, nextToken);
+                    if (builder) {
+                        yield builder.build(cdf, nextToken, { index, windowIndex, windowReset, contextLength });
+                        windowReset = false;
+                    }
+                    progress?.update();
+                    if (nextTokenIdx === tokens.length || contextLength === model.nCtx) break;
+                    model.eval([nextToken]);
+                    contextLength++;
+                    await this.#maybeYield();
+                }
+            }
+            progress?.close();
+            tokenEncoder.finish();
+            finished = true;
+            return { compressed: tokenEncoder.getEncoded(), totalBits: builder ? builder.cumulativeBits : null, tokens: tokens.length };
+        }
+        finally {
+            if (!finished) this.#clearContext();
+            release();
+        }
     }
 
     tokenizerAddsSpacePrefix() {
@@ -302,54 +383,92 @@ export class LlamaZip {
 
     // Throws if `signal` aborts (its reason, or an AbortError), the data ends before an EOS
     // token (the Python tool would loop forever), or more than maxTokens tokens come out.
-    async decompress(compressed, windowOverlap = 0, { signal = null, maxTokens = Infinity } = {}) {
-        this.#checkOverlap(windowOverlap);
-        const model = this.model;
-        const eos = model.tokenEos();
-        const seenTokens = [];
-        const output = [];
-        const tokenDecoder = new Decoder(compressed);
-        const utf8Decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
-        const bitLimit = compressed.length * 8 + DECODER_LOOKAHEAD_BITS;
-        let done = false;
-        while (!done) {
-            const startIdx = Math.max(0, seenTokens.length - windowOverlap);
-            let contextLength = this.#startWindow(seenTokens.slice(startIdx));
+    // onStep, topK and outputBitsCap are as in compress, and the steps equal the ones compress
+    // produced for the same message (the decoder's state is replayed by an encoder that codes
+    // the decoded tokens, which is bit-identical to the original one).
+    async decompress(compressed, windowOverlap = 0, { signal = null, maxTokens = Infinity, onStep = null, topK, outputBitsCap } = {}) {
+        const steps = this.#decompressSteps(compressed, windowOverlap, { signal, maxTokens, observe: onStep !== null, topK, outputBitsCap });
+        try {
             for (;;) {
-                const logits = model.logits({ copy: false });
-                if (signal?.aborted) throw signal.reason ?? new DOMException('aborted', 'AbortError');
-                const cdf = this.computeCdf(logits);
-                const nextToken = tokenDecoder.decodeSymbol(cdf);
-                if (nextToken === eos) {
-                    done = true;
-                    break;
-                }
-                if (tokenDecoder.bitsRead > bitLimit) {
-                    throw new Error('compressed data ended before an end-of-stream token (truncated or corrupt data, or a different model, window overlap or format)');
-                }
-                if (seenTokens.length >= maxTokens) throw new Error(`decompression stopped after ${maxTokens} tokens without an end-of-stream token`);
-                let nextUtf8 = model.detokenize([nextToken]);
-                if (seenTokens.length === 0 && nextUtf8[0] === 0x20 && this.tokenizerAddsSpacePrefix()) {
-                    nextUtf8 = nextUtf8.slice(1);
-                }
-                seenTokens.push(nextToken);
-                let text;
-                try {
-                    text = utf8Decoder.decode(nextUtf8, { stream: true });
-                }
-                catch {
-                    throw new Error('decoded bytes are not valid UTF-8 (corrupt data, or a different model or window overlap)');
-                }
-                const nextBytes = utf8ToBytes(text);
-                for (const byte of nextBytes) output.push(byte);
-                if (this.verbose) this.#sinks().out.write(nextBytes);
-                if (contextLength === model.nCtx) break;
-                model.eval([nextToken]);
-                contextLength++;
-                await this.#maybeYield();
+                const next = await steps.next();
+                if (next.done) return next.value;
+                await onStep(next.value);
             }
         }
-        if (this.verbose) await this.#sinks().out.flush();
-        return Uint8Array.from(output);
+        finally {
+            await steps.return();
+        }
+    }
+
+    async *#decompressSteps(compressed, windowOverlap, { signal, maxTokens, observe, topK, outputBitsCap }) {
+        this.#checkOverlap(windowOverlap);
+        const release = this.#claim();
+        let finished = false;
+        try {
+            const model = this.model;
+            const eos = model.tokenEos();
+            const seenTokens = [];
+            const output = [];
+            const tokenDecoder = new Decoder(compressed);
+            const shadow = observe ? new Encoder() : null;
+            const builder = observe ? new StepBuilder(model, shadow, { topK, outputBitsCap }) : null;
+            let windowIndex = -1;
+            const utf8Decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+            const bitLimit = compressed.length * 8 + DECODER_LOOKAHEAD_BITS;
+            let done = false;
+            while (!done) {
+                const startIdx = Math.max(0, seenTokens.length - windowOverlap);
+                let contextLength = this.#startWindow(seenTokens.slice(startIdx));
+                windowIndex++;
+                let windowReset = windowIndex > 0;
+                for (;;) {
+                    const logits = model.logits({ copy: false });
+                    if (signal?.aborted) throw signal.reason ?? new DOMException('aborted', 'AbortError');
+                    const cdf = this.computeCdf(logits);
+                    const nextToken = tokenDecoder.decodeSymbol(cdf);
+                    if (nextToken !== eos) {
+                        if (tokenDecoder.bitsRead > bitLimit) {
+                            throw new Error('compressed data ended before an end-of-stream token (truncated or corrupt data, or a different model, window overlap or format)');
+                        }
+                        if (seenTokens.length >= maxTokens) throw new Error(`decompression stopped after ${maxTokens} tokens without an end-of-stream token`);
+                    }
+                    if (builder) {
+                        shadow.encodeSymbol(cdf, nextToken);
+                        yield builder.build(cdf, nextToken, { index: seenTokens.length, windowIndex, windowReset, contextLength });
+                        windowReset = false;
+                    }
+                    if (nextToken === eos) {
+                        done = true;
+                        break;
+                    }
+                    let nextUtf8 = model.detokenize([nextToken]);
+                    if (seenTokens.length === 0 && nextUtf8[0] === 0x20 && this.tokenizerAddsSpacePrefix()) {
+                        nextUtf8 = nextUtf8.slice(1);
+                    }
+                    seenTokens.push(nextToken);
+                    let text;
+                    try {
+                        text = utf8Decoder.decode(nextUtf8, { stream: true });
+                    }
+                    catch {
+                        throw new Error('decoded bytes are not valid UTF-8 (corrupt data, or a different model or window overlap)');
+                    }
+                    const nextBytes = utf8ToBytes(text);
+                    for (const byte of nextBytes) output.push(byte);
+                    if (this.verbose) this.#sinks().out.write(nextBytes);
+                    if (contextLength === model.nCtx) break;
+                    model.eval([nextToken]);
+                    contextLength++;
+                    await this.#maybeYield();
+                }
+            }
+            if (this.verbose) await this.#sinks().out.flush();
+            finished = true;
+            return Uint8Array.from(output);
+        }
+        finally {
+            if (!finished) this.#clearContext();
+            release();
+        }
     }
 }

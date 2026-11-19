@@ -97,6 +97,7 @@ export const parseWindowOverlap = (argument, nCtx) => {
 
 const USAGE = `usage: ${PROG} [-h] [-f {binary,base64}] [-w OVERLAP] [--n-ctx N_CTX]
        ${' '.repeat(PROG.length)} [--n-gpu-layers N_GPU_LAYERS] [--n-threads N_THREADS] [--use-mlock]
+       ${' '.repeat(PROG.length)} [--trace]
        ${' '.repeat(PROG.length)} (-c [STRING ...] | -d [COMPRESSED ...] | -i)
        ${' '.repeat(PROG.length)} model_path
 `;
@@ -119,6 +120,7 @@ options:
   --n-threads N_THREADS
                         number of CPU threads. must use same value for compression and decompression (default: ${DEFAULT_N_THREADS})
   --use-mlock           use mlock to keep model in RAM (disabled by default)
+  --trace               with -c, print one JSON line per coded token (see the README) instead of the compressed data
   -c, --compress [STRING ...]
                         compress argument string (or stdin if no argument is provided)
   -d, --decompress [COMPRESSED ...]
@@ -140,6 +142,7 @@ const OPTIONS = [
     { flags: ['--n-gpu-layers'], dest: 'nGpuLayers', kind: 'value', type: intType },
     { flags: ['--n-threads'], dest: 'nThreads', kind: 'value', type: intType },
     { flags: ['--use-mlock'], dest: 'useMlock', kind: 'flag' },
+    { flags: ['--trace'], dest: 'trace', kind: 'flag' },
     { flags: ['-c', '--compress'], dest: 'string', kind: 'list', mode: true },
     { flags: ['-d', '--decompress'], dest: 'compressed', kind: 'list', mode: true },
     { flags: ['-i', '--interactive'], dest: 'interactive', kind: 'flag', mode: true },
@@ -182,6 +185,7 @@ export const parseArgs = argv => {
         nGpuLayers: -1,
         nThreads: DEFAULT_N_THREADS,
         useMlock: false,
+        trace: false,
         string: null,
         compressed: null,
         interactive: false,
@@ -247,6 +251,7 @@ export const parseArgs = argv => {
     if (positionals.length > 0) args.modelPath = positionals.shift();
     if (args.modelPath === undefined) throw new ArgumentError('the following arguments are required: model_path');
     if (!mode) throw new ArgumentError('one of the arguments -c/--compress -d/--decompress -i/--interactive is required');
+    if (args.trace && args.string === null) throw new ArgumentError('argument --trace: only allowed with argument -c/--compress');
     unrecognized.push(...positionals);
     if (unrecognized.length > 0) throw new ArgumentError(`unrecognized arguments: ${unrecognized.join(' ')}`);
     return args;
@@ -392,8 +397,15 @@ export const main = async (argv, deps = {}) => {
 
         if (args.string !== null) {
             const uncompressed = args.string.length > 0 ? new TextEncoder().encode(args.string.join(' ')) : await readStdin();
-            const compressed = await compress(uncompressed);
-            io.out.write(args.compressedFormat === 'base64' ? b64encode(compressed) : compressed);
+            if (args.trace) {
+                await interruptible(async signal => {
+                    for await (const step of zip.trace(uncompressed, windowOverlap, { signal })) io.out.write(`${JSON.stringify(step)}\n`);
+                });
+            }
+            else {
+                const compressed = await compress(uncompressed);
+                io.out.write(args.compressedFormat === 'base64' ? b64encode(compressed) : compressed);
+            }
         }
         else if (args.compressed !== null) {
             let compressed = args.compressed.length > 0 ? new TextEncoder().encode(args.compressed[0]) : await readStdin();
