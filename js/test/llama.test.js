@@ -1,7 +1,7 @@
 // Smoke and determinism tests for js/llama.js.
 //   tjs run js/test/llama.test.js
 // Env: LLAMA_ZIP_TEST_MODEL (GGUF path), LLAMA_LIB (libllama path).
-import { LlamaModel, ModelParams, ContextParams, Batch, KNOWN_VERSIONS, checkVersion } from '../llama.js';
+import { LlamaModel, ModelParams, ContextParams, Batch, KNOWN_VERSIONS, checkVersion, libraryInfo } from '../llama.js';
 import { test, assert, info, run } from './run.js';
 
 const MODEL_PATH = tjs.env.LLAMA_ZIP_TEST_MODEL
@@ -82,6 +82,7 @@ test('library version check: known, unknown, missing llama_version, override', (
 test('the loaded library reports a known version and the model exposes it', () => {
     assert.ok(Object.hasOwn(KNOWN_VERSIONS, model.llamaVersion) || tjs.env.LLAMA_ZIP_ALLOW_UNTESTED === '1', model.llamaVersion);
     assert.ok(model.llamaBuild.startsWith(model.llamaVersion));
+    assert.equal(libraryInfo().text, model.llamaBuild);
     info(`${model.llamaBuild}; ${model.systemInfo.trim()}`);
 });
 

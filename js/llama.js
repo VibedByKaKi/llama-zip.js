@@ -27,6 +27,7 @@
 //   model.llamaVersion            version reported by the library, e.g. '1.0.0'
 //   model.llamaBuild              version and build number, e.g. '1.0.0 (build 12359)'
 //                                 (only the version when the build number is unknown)
+//   libraryInfo()                 { version, build, text } of the library, without opening a model
 //   model.systemInfo              llama_print_system_info() of the loaded backends
 //   model.tokenBos(), model.tokenEos()
 //   model.tokenize(bytes|string, { addBos = false, special = false }) -> Int32Array
@@ -244,6 +245,14 @@ const loadNative = () => {
     }
     native = { lib, symbols: lib.symbols, ggml, libPath, version, build };
     return native;
+};
+
+// The version and build of the library that LlamaModel would use, { version, build, text }.
+// Throws what the constructor throws when there is no usable library. The app uses it to
+// name the installed version in its messages after a model failed to load.
+export const libraryInfo = () => {
+    const { version, build } = loadNative();
+    return { version, build, text: build ? `${version} (build ${build})` : version };
 };
 
 const installLogging = (symbols, verbose) => {
