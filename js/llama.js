@@ -1,9 +1,13 @@
 // Minimal binding to the system libllama through tjs:ffi (txiki.js).
 //
-// Targets llama.cpp build b10180 (llama.h of that version). The struct layouts
-// below follow that header and are checked at load time against the sizes the
-// C compiler reports, so a libllama with a different ABI fails loudly
-// instead of crashing later.
+// Targets llama.cpp 1.0.0 (build 12359), the llama.h of that release. The struct
+// layouts below are written by hand for that header. A struct passed by value
+// with the wrong layout corrupts the call without any error, and the library
+// cannot tell us its layout, so the binding asks llama_version() and accepts
+// only the versions in KNOWN_VERSIONS. Older libraries have no llama_version()
+// and are rejected. Another version is rejected too, unless the environment
+// variable LLAMA_ZIP_ALLOW_UNTESTED=1 is set. The expected sizes and offsets are
+// in js/test/llama.test.js, generated from the real header with a C compiler.
 //
 // API
 //   const model = new LlamaModel({ path, nCtx = 0, nGpuLayers = 0,
@@ -20,6 +24,10 @@
 //   model.nBatch                  effective batch size, nBatch clamped to nCtx
 //   model.nVocab                  vocabulary size (length of logits())
 //   model.nPast                   tokens currently in the context
+//   model.llamaVersion            version reported by the library, e.g. '1.0.0'
+//   model.llamaBuild              version and build number, e.g. '1.0.0 (build 12359)'
+//                                 (only the version when the build number is unknown)
+//   model.systemInfo              llama_print_system_info() of the loaded backends
 //   model.tokenBos(), model.tokenEos()
 //   model.tokenize(bytes|string, { addBos = false, special = false }) -> Int32Array
 //       Same as llama-cpp-python's tokenize(): addBos maps to add_special and
@@ -52,8 +60,12 @@ import { dlopen, defineStruct, JSCallback, types, suffix } from 'tjs:ffi';
 
 const IS_WINDOWS = suffix === 'dll';
 
+// Versions whose llama.h layouts were checked, with their build numbers.
+export const KNOWN_VERSIONS = { '1.0.0': 12359 };
+const OLD_LIBRARY_MESSAGE = 'needs llama.cpp 1.0.0 (build 12359) or newer layout-compatible';
+
 const libCandidates = () => {
-    const names = suffix === 'dylib' ? ['libllama.dylib'] : IS_WINDOWS ? ['llama.dll', 'libllama.dll'] : ['libllama.so', 'libllama.so.0'];
+    const names = suffix === 'dylib' ? ['libllama.dylib', 'libllama.1.dylib'] : IS_WINDOWS ? ['llama.dll', 'libllama.dll'] : ['libllama.so', 'libllama.so.1'];
     const dirs = suffix === 'dylib'
         ? ['/opt/homebrew/lib', '/usr/local/lib', '/opt/local/lib', '/usr/lib']
         : IS_WINDOWS
@@ -63,13 +75,15 @@ const libCandidates = () => {
     return [...names.flatMap(name => dirs.filter(Boolean).map(dir => `${dir}/${name}`)), ...names];
 };
 
-// Struct layouts for llama.h b10180 (x86-64 and arm64 LP64: 72, 160 and 56 bytes).
-const ModelParams = defineStruct([
+// Struct layouts for llama.h 1.0.0 (x86-64 and arm64 LP64: 80, 176 and 56 bytes).
+// defineStruct() inserts the alignment padding itself, the order is the header order.
+export const ModelParams = defineStruct([
     ['devices', 'pointer'],
     ['tensor_buft_overrides', 'pointer'],
     ['n_gpu_layers', 'i32'],
     ['split_mode', 'i32'],
     ['load_mode', 'i32'],
+    ['lazy_mode', 'i32'],
     ['main_gpu', 'i32'],
     ['tensor_split', 'pointer'],
     ['progress_callback', 'pointer'],
@@ -80,14 +94,16 @@ const ModelParams = defineStruct([
     ['use_extra_bufts', 'bool_u8'],
     ['no_host', 'bool_u8'],
     ['no_alloc', 'bool_u8'],
+    ['load_mtp', 'bool_u8'],
 ]);
-const ContextParams = defineStruct([
+export const ContextParams = defineStruct([
     ['n_ctx', 'u32'],
     ['n_batch', 'u32'],
     ['n_ubatch', 'u32'],
     ['n_seq_max', 'u32'],
     ['n_rs_seq', 'u32'],
     ['n_outputs_max', 'u32'],
+    ['n_outputs_max_per_seq', 'u32'],
     ['n_threads', 'i32'],
     ['n_threads_batch', 'i32'],
     ['ctx_type', 'i32'],
@@ -102,11 +118,12 @@ const ContextParams = defineStruct([
     ['yarn_beta_fast', 'f32'],
     ['yarn_beta_slow', 'f32'],
     ['yarn_orig_ctx', 'u32'],
-    ['defrag_thold', 'f32'],
     ['cb_eval', 'pointer'],
     ['cb_eval_user_data', 'pointer'],
     ['type_k', 'i32'],
     ['type_v', 'i32'],
+    ['moe_cache_size', 'u64'],
+    ['moe_cache_cpu_share', 'f32'],
     ['abort_callback', 'pointer'],
     ['abort_callback_data', 'pointer'],
     ['embeddings', 'bool_u8'],
@@ -119,7 +136,7 @@ const ContextParams = defineStruct([
     ['n_samplers', 'u64'],
     ['ctx_other', 'pointer'],
 ]);
-const Batch = defineStruct([
+export const Batch = defineStruct([
     ['n_tokens', 'i32'],
     ['token', 'pointer'],
     ['embd', 'pointer'],
@@ -139,6 +156,8 @@ let logVerbose = false;
 let logTail = [];
 
 const symbolTable = {
+    llama_version: { args: [], returns: 'string', optional: true },
+    llama_print_system_info: { args: [], returns: 'string' },
     llama_backend_init: { args: [], returns: 'void' },
     llama_backend_free: { args: [], returns: 'void' },
     llama_log_set: { args: ['pointer', 'pointer'] },
@@ -163,6 +182,32 @@ const symbolTable = {
     llama_token_to_piece: { args: ['pointer', 'i32', 'buffer', 'i32', 'i32', 'bool_u8'], returns: 'i32' },
 };
 
+// llama_build_number() is C++ and lives in libllama-common, which not every
+// package ships. The version table covers the known releases without it.
+const readBuild = libPath => {
+    const dir = libPath.includes('/') ? libPath.slice(0, libPath.lastIndexOf('/') + 1) : '';
+    const names = suffix === 'dylib' ? ['libllama-common.dylib', 'libllama-common.1.dylib'] : IS_WINDOWS ? ['llama-common.dll'] : ['libllama-common.so', 'libllama-common.so.1'];
+    for (const name of [...names.map(base => dir + base), ...names]) {
+        try {
+            const symbol = IS_WINDOWS ? '?llama_build_number@@YAHXZ' : '_Z18llama_build_numberv';
+            const number = dlopen(name, { [symbol]: { args: [], returns: 'i32' } }).symbols[symbol]();
+            if (number > 0) return number;
+        }
+        catch {}
+    }
+    return null;
+};
+
+export const checkVersion = (llamaVersion, libPath) => {
+    if (typeof llamaVersion !== 'function') throw new Error(`${libPath} ${OLD_LIBRARY_MESSAGE}. It has no llama_version(), so its struct layouts predate the ones this binding uses.`);
+    const version = String(llamaVersion());
+    if (!Object.hasOwn(KNOWN_VERSIONS, version) && tjs.env.LLAMA_ZIP_ALLOW_UNTESTED !== '1') {
+        throw new Error(`${libPath} is llama.cpp ${version}, which llama-zip.js has not been tested with (tested: ${Object.keys(KNOWN_VERSIONS).join(', ')}). `
+            + 'A changed struct layout corrupts calls without any error. Set LLAMA_ZIP_ALLOW_UNTESTED=1 to use it anyway.');
+    }
+    return { version, build: KNOWN_VERSIONS[version] ?? readBuild(libPath) };
+};
+
 const loadNative = () => {
     if (native) return native;
     const candidates = [];
@@ -184,9 +229,7 @@ const loadNative = () => {
     if (!lib) {
         throw new Error(`libllama not found. Set LLAMA_LIB to its full path. Tried (dlopen errors): ${failures.join('; ')}`);
     }
-    if (ModelParams.size !== 72 || ContextParams.size !== 160 || Batch.size !== 56) {
-        throw new Error(`struct layout mismatch for llama.h b10180 (model ${ModelParams.size}/72, context ${ContextParams.size}/160, batch ${Batch.size}/56)`);
-    }
+    const { version, build } = checkVersion(lib.symbols.llama_version, libPath);
     // The CPU and GPU backends are separate shared objects. ggml_backend_load_all lives in libggml-base,
     // which libllama already loaded, so asking for it by name returns the same handle.
     const dir = libPath.includes('/') ? libPath.slice(0, libPath.lastIndexOf('/') + 1) : '';
@@ -199,7 +242,7 @@ const loadNative = () => {
         }
         catch {}
     }
-    native = { lib, symbols: lib.symbols, ggml, libPath };
+    native = { lib, symbols: lib.symbols, ggml, libPath, version, build };
     return native;
 };
 
@@ -236,6 +279,9 @@ export class LlamaModel {
 
     nCtx = 0;
     nVocab = 0;
+    llamaVersion = '';
+    llamaBuild = '';
+    systemInfo = '';
 
     constructor({ path: modelPath, nCtx = 0, nGpuLayers = 0, useMlock = false, nBatch = 512, nThreads = 0, verbose = false } = {}) {
         if (!modelPath) throw new Error('LlamaModel: path is required');
@@ -247,6 +293,9 @@ export class LlamaModel {
             n.symbols.llama_backend_init();
             n.ggml.ggml_backend_load_all?.();
         }
+        this.llamaVersion = n.version;
+        this.llamaBuild = n.build ? `${n.version} (build ${n.build})` : n.version;
+        this.systemInfo = n.symbols.llama_print_system_info();
         try {
             const mp = n.symbols.llama_model_default_params();
             mp.n_gpu_layers = nGpuLayers;

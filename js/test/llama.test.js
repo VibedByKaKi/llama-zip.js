@@ -1,7 +1,7 @@
 // Smoke and determinism tests for js/llama.js.
 //   tjs run js/test/llama.test.js
 // Env: LLAMA_ZIP_TEST_MODEL (GGUF path), LLAMA_LIB (libllama path).
-import { LlamaModel } from '../llama.js';
+import { LlamaModel, ModelParams, ContextParams, Batch, KNOWN_VERSIONS, checkVersion } from '../llama.js';
 import { test, assert, info, run } from './run.js';
 
 const MODEL_PATH = tjs.env.LLAMA_ZIP_TEST_MODEL
@@ -32,6 +32,58 @@ const maxAbsDiff = (a, b) => {
 
 const TEXT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. '.repeat(6)
     + 'The quick brown fox jumps over the lazy dog. Zażółć gęślą jaźń, 日本語のテキスト, 😀.';
+
+// Expected layouts of llama.h 1.0.0 on LP64 (x86-64 and arm64 Linux and macOS). Generated from the
+// real header, not from this binding: a C program included /home/linuxbrew/.linuxbrew/include/llama.h
+// and printed sizeof and offsetof for every field (gcc -I<include dir> probe.c && ./probe).
+// Regenerate it the same way for a new llama.cpp version before adding it to KNOWN_VERSIONS.
+// Windows (LLP64) has the same layout, because no field is a long.
+const LAYOUTS = {
+    llama_model_params: { size: 80, fields: {
+        devices: 0, tensor_buft_overrides: 8, n_gpu_layers: 16, split_mode: 20, load_mode: 24, lazy_mode: 28,
+        main_gpu: 32, tensor_split: 40, progress_callback: 48, progress_callback_user_data: 56, kv_overrides: 64,
+        vocab_only: 72, check_tensors: 73, use_extra_bufts: 74, no_host: 75, no_alloc: 76, load_mtp: 77
+    } },
+    llama_context_params: { size: 176, fields: {
+        n_ctx: 0, n_batch: 4, n_ubatch: 8, n_seq_max: 12, n_rs_seq: 16, n_outputs_max: 20, n_outputs_max_per_seq: 24,
+        n_threads: 28, n_threads_batch: 32, ctx_type: 36, rope_scaling_type: 40, pooling_type: 44, attention_type: 48,
+        flash_attn_type: 52, rope_freq_base: 56, rope_freq_scale: 60, yarn_ext_factor: 64, yarn_attn_factor: 68,
+        yarn_beta_fast: 72, yarn_beta_slow: 76, yarn_orig_ctx: 80, cb_eval: 88, cb_eval_user_data: 96, type_k: 104,
+        type_v: 108, moe_cache_size: 112, moe_cache_cpu_share: 120, abort_callback: 128, abort_callback_data: 136,
+        embeddings: 144, offload_kqv: 145, no_perf: 146, op_offload: 147, swa_full: 148, kv_unified: 149,
+        samplers: 152, n_samplers: 160, ctx_other: 168
+    } },
+    llama_batch: { size: 56, fields: { n_tokens: 0, token: 8, embd: 16, pos: 24, n_seq_id: 32, seq_id: 40, logits: 48 } }
+};
+
+for (const [name, struct] of [['llama_model_params', ModelParams], ['llama_context_params', ContextParams], ['llama_batch', Batch]])
+    test(`${name} layout equals the C compiler's (size and every offset)`, () => {
+        const expected = LAYOUTS[name];
+        const actual = Object.fromEntries(struct.describe().map(field => [field.name, field.offset]));
+        assert.equal(struct.size, expected.size, 'sizeof');
+        assert.deepEqual(actual, expected.fields);
+    });
+
+test('library version check: known, unknown, missing llama_version, override', () => {
+    assert.deepEqual(Object.keys(KNOWN_VERSIONS), ['1.0.0']);
+    assert.equal(checkVersion(() => '1.0.0', 'lib').build, 12359);
+    assert.throws(() => checkVersion(undefined, '/old/libllama.so'), /needs llama\.cpp 1\.0\.0 \(build 12359\) or newer layout-compatible/);
+    assert.throws(() => checkVersion(() => '1.1.0', 'lib'), /1\.1\.0.*LLAMA_ZIP_ALLOW_UNTESTED=1/);
+    tjs.env.LLAMA_ZIP_ALLOW_UNTESTED = '1';
+    try {
+        assert.equal(checkVersion(() => '1.1.0', 'lib').version, '1.1.0');
+        assert.throws(() => checkVersion(undefined, 'lib'), /needs llama\.cpp/);
+    }
+    finally {
+        delete tjs.env.LLAMA_ZIP_ALLOW_UNTESTED;
+    }
+});
+
+test('the loaded library reports a known version and the model exposes it', () => {
+    assert.ok(Object.hasOwn(KNOWN_VERSIONS, model.llamaVersion) || tjs.env.LLAMA_ZIP_ALLOW_UNTESTED === '1', model.llamaVersion);
+    assert.ok(model.llamaBuild.startsWith(model.llamaVersion));
+    info(`${model.llamaBuild}; ${model.systemInfo.trim()}`);
+});
 
 // One model for the cheap checks. Tests needing other settings open their own.
 const model = open();
