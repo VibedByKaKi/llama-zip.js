@@ -163,7 +163,8 @@ Model-independent test vectors (arithmetic coder, UTF-8 mapping, base64, window 
 
 | File | Contents |
 | --- | --- |
-| `js/llamazip.js` | `LlamaZip` class (`compress`, `decompress`, `computeCdf`) |
+| `js/llamazip.js` | `LlamaZip` class (`compress`, `decompress`, `trace`, `computeCdf`) |
+| `js/trace.js` | Step objects for observing the coder (`StepBuilder`, `selectTopTokens`) |
 | `js/arithmetic.js` | `Encoder` and `Decoder`, with BigInt for the 64-bit state |
 | `js/utf8.js` | `Utf8Chunks`, `bytesToUtf8`, `utf8ToBytes` and the private use area mapping |
 | `js/cli.js` | Command line tool with the same flags as `llama_zip.py` |
@@ -190,6 +191,9 @@ tjs run js/cli.js /path/to/llm.gguf -d < file.lz
 
 # Interactive mode, with a window overlap of 50% of the context
 tjs run js/cli.js /path/to/llm.gguf -i -w 50%
+
+# One JSON line per coded token instead of the compressed data (see "Observing the coder")
+tjs run js/cli.js /path/to/llm.gguf --trace -c "We the People"
 ```
 
 Ctrl-C during compression stops early and finishes the stream, so the output still decompresses to the part that was read. During decompression and at the prompt it exits like the Python tool.
@@ -206,6 +210,60 @@ zip.close();
 ```
 
 `compress` and `decompress` return `Uint8Array` and are async, so the event loop runs while they work. Both take `{ signal }` (an `AbortSignal`) as a third argument, and `decompress` also takes `{ maxTokens }`. `decompress` throws an error when the data ends without an end-of-stream token, where the Python tool would loop forever.
+
+### Observing the coder
+
+`compress`, `decompress` and `trace` can report every coded token, for example to draw the arithmetic coding diagram of the 3Blue1Brown video live from the user's own model. Observers only read the coder's state. The compressed bytes are identical with and without them (a test checks it).
+
+```js
+// Callback. A returned promise is awaited, so the callback can set the pace.
+await zip.compress(bytes, 0, { onStep: async step => { draw(step); await nextFrame(); }, topK: 16 });
+await zip.decompress(compressed, 0, { onStep: draw });   // the same steps as compress gave
+
+// Generator. Stop with break or return() and the model's half-finished window is cleared.
+const generator = zip.trace(bytes, 0, { topK: 16 });
+for (;;) {
+    const next = await generator.next();
+    if (next.done) { const { compressed, totalBits, tokens } = next.value; break; }
+    draw(next.value);
+}
+```
+
+Options (third argument, next to `signal`): `onStep` (compress and decompress only), `topK` (candidates per step, default 16) and `outputBitsCap` (length of `outputBits`, default 256). `trace` returns `{ compressed, totalBits, tokens }`. `totalBits` is the sum of the steps' `bits`, the ideal code length. The compressed size is that plus at most about 70 bits, because the coder keeps 64 bits of interval and `finish` writes one more bit. One `LlamaZip` runs one call at a time, and a second call while one is in progress throws.
+
+Each step is a plain object that `JSON.stringify` accepts (no BigInt, no typed arrays). `--trace` prints one per line:
+
+| Field | Meaning |
+| --- | --- |
+| `index` | Position of the token in the message. The end-of-stream token is the last one. |
+| `tokenId` | The coded token. |
+| `piece` | The token's text, decoded as UTF-8 with U+FFFD for bytes that are not complete characters. `""` for the end-of-stream token. |
+| `pieceBytes` | The token's bytes as an array when `piece` lost something, otherwise `null`. |
+| `isEos` | True for the end-of-stream token. |
+| `probability` | The chosen token's probability, from the integer table the coder used, as a float64. |
+| `bits` | `-log2(probability)`. |
+| `cumulativeBits` | Sum of `bits` up to and including this step. |
+| `lo`, `hi` | The chosen token's sub-interval of its parent interval, as fractions in [0, 1]. Tokens are laid out in id order, so `lo` is the probability of all lower ids. The viewport zooms from `[0, 1]` into `[lo, hi]` for the next step. |
+| `candidates` | The `topK` most probable tokens, most probable first, plus the chosen token if it is not among them. Each is `{ tokenId, piece, p, lo, hi, chosen }`, with `lo` and `hi` in the same parent interval as the step's. |
+| `otherProbability` | Probability of the tokens not in `candidates`. `p` of all candidates plus this is 1. |
+| `emittedBits` | Output bits finalised so far. Bits the coder holds back are not counted. |
+| `newBits` | The bits finalised by this step, as a string of 0 and 1. Often empty, sometimes several. |
+| `outputBits` | The last `outputBitsCap` finalised bits as a string. Appending `newBits` from every step gives the whole stream. |
+| `pendingUnderflow` | Number of held-back bits. The next shift writes them as the inverse of its bit. |
+| `coderLow`, `coderHigh` | The coder's 64-bit interval after this token, as 16 digit hex strings. |
+| `windowIndex` | Context window of the token, from 0. |
+| `windowReset` | True for the first token of a window after the first. The model's context was cleared and refilled. |
+| `contextLength` | Number of tokens in the model's context when it predicted this one. |
+
+Example, the third token of "We the People of the United States" with SmolLM2-135M and `topK: 3`:
+
+```json
+{"index":2,"tokenId":4228,"piece":" People","pieceBytes":null,"isEos":false,"probability":0.6377702377532877,"bits":0.6488913206706486,"cumulativeBits":19.98822021104968,"lo":0.20337721673035078,"hi":0.8411474544836385,"candidates":[{"tokenId":4228,"piece":" People","p":0.6377702377532877,"lo":0.20337721673035078,"hi":0.8411474544836385,"chosen":true},{"tokenId":701,"piece":" people","p":0.15053150454718908,"lo":0.014596026592820032,"hi":0.1651275311400091,"chosen":false},{"tokenId":5194,"piece":" Children","p":0.009491616825882065,"lo":0.8489263035197472,"hi":0.8584179203456292,"chosen":false}],"otherProbability":0.20220664087364115,"emittedBits":19,"newBits":"","outputBits":"0001010011101000001","pendingUnderflow":0,"coderLow":"5e39d4f301577f31","coderHigh":"df467b65a62ba824","windowIndex":0,"windowReset":false,"contextLength":3}
+```
+
+Cost. Without `onStep` the loop does no extra work (SmolLM2-135M Q8_0, 55 tokens: about 1.17 s per run before and after). With it, each step costs about 5 ms more, of which about 4 ms is the scan that picks the top K in one pass over the 49,152 entries. A full sort would take about 23 ms per token in txiki.js.
+
+The first token of a decoded message has its leading space dropped from the output when the tokenizer adds one, but `piece` shows the token as the model sees it, so encode and decode steps are equal.
 
 ### Differences from the Python tool
 
@@ -225,4 +283,4 @@ tjs run js/test/all.js arithmetic utf8      # chosen modules
 tjs run js/test/llamazip.test.js            # one module
 ```
 
-The modules are `arithmetic`, `utf8`, `base64`, `compute_cdf`, `llamazip` and `cli`, which mirror the Python modules of the same names, `integration`, which does round trips with the real model and the CLI and is skipped when libllama or the model is missing (`LLAMA_ZIP_TEST_MODEL` and `LLAMA_LIB` choose them), and `llama`, the binding's own tests. txiki.js has no coverage tool, so the JS suite has no coverage number.
+The modules are `arithmetic`, `utf8`, `base64`, `compute_cdf`, `llamazip`, `trace` (the step API, with one real-model test that is skipped when the model is missing) and `cli`, which mirror the Python modules of the same names, `integration`, which does round trips with the real model and the CLI and is skipped when libllama or the model is missing (`LLAMA_ZIP_TEST_MODEL` and `LLAMA_LIB` choose them), and `llama`, the binding's own tests. txiki.js has no coverage tool, so the JS suite has no coverage number.
